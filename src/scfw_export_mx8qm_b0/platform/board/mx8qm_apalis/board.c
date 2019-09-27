@@ -217,23 +217,9 @@ const uint32_t board_ddr_derate_period_ms = 1000U;
 /*--------------------------------------------------------------------------*/
 void board_init(boot_phase_t phase)
 {
-    gpio_pin_config_t config;
-    config.pinDirection = kGPIO_DigitalOutput;
-
     ss_print(3, "board_init(%d)\n", phase);
 
-    if (phase == BOOT_PHASE_HW_INIT)
-    {
-        /* RESET_MOCI# */
-        /* for now, take stuff out of reset early */
-        (void) pad_set_mux(SC_PT, SC_P_SCU_GPIO0_02, 0, SC_PAD_CONFIG_NORMAL,
-            SC_PAD_ISO_OFF);
-        config.outputLogic  = 1U;
-        FGPIO_PinInit(FGPIOA, 2U, &config);
-
-        SystemTimeDelay(2U);
-    }
-    else if (phase == BOOT_PHASE_FINAL_INIT)
+    if (phase == BOOT_PHASE_FINAL_INIT)
     {
         /* Configure SNVS button for rising edge */
         SNVS_ConfigButton(SNVS_DRV_BTN_CONFIG_RISINGEDGE, SC_TRUE);
@@ -372,18 +358,15 @@ void board_config_sc(sc_rm_pt_t pt_sc)
         SC_FALSE);
     (void) rm_set_pad_movable(pt_sc, SC_P_PMIC_I2C_SDA, SC_P_PMIC_I2C_SCL,
         SC_FALSE);
-    /* SCU_UART0_RX, SCU_UART0_TX, RESET_MOCI#_DRV */
+    /* SCU_UART0_RX, SCU_UART0_TX */
     #ifdef ALT_DEBUG_SCU_UART
         (void) rm_set_resource_movable(SC_PT, SC_R_SC_UART, SC_R_SC_UART,
             SC_FALSE);
         (void) rm_set_pad_movable(pt_sc, SC_P_SCU_GPIO0_00,
             SC_P_SCU_GPIO0_01, SC_FALSE);
     #endif
-    /* RESET_MOCI#_DRV */
-    (void) rm_set_pad_movable(pt_sc, SC_P_SCU_GPIO0_02,
-        SC_P_SCU_GPIO0_02, SC_FALSE);
-    /* HSIC_HUB_CONNECT */
-    (void) rm_set_pad_movable(pt_sc, SC_P_SCU_GPIO0_03, SC_P_SCU_GPIO0_03,
+    /* RESET_MOCI#_DRV, HSIC_HUB_CONNECT */
+    (void) rm_set_pad_movable(pt_sc, SC_P_SCU_GPIO0_02, SC_P_SCU_GPIO0_03,
         SC_TRUE);
     /* PMIC_PGOOD */
     (void) rm_set_pad_movable(pt_sc, SC_P_SCU_GPIO0_04, SC_P_SCU_GPIO0_04,
