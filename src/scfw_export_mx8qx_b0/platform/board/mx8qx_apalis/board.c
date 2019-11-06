@@ -380,7 +380,7 @@ board_parm_rtn_t board_parameter(board_parm_t parm)
         /* Used whenever HSIO SS powered up. Valid return values are
            BOARD_PARM_RTN_EXTERNAL or BOARD_PARM_RTN_INTERNAL */
         case BOARD_PARM_PCIE_PLL :
-            rtn = BOARD_PARM_RTN_EXTERNAL;
+            rtn = BOARD_PARM_RTN_INTERNAL;
             break;
         case BOARD_PARM_KS1_RESUME_USEC:
             rtn = BOARD_KS1_RESUME_USEC;
