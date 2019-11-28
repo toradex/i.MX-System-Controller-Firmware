@@ -77,8 +77,8 @@
  * results in a ramp rate of 7,813mV/us.
  * 1100 mV / 7.813 mV/us => 140.791 us
  */
-#define PMIC_MAX_RAMP           141U    /* Max PMIC ramp delay in uS */
-#define PMIC_MAX_RAMP_RATE      7813U   /* PMIC voltage ramp (nV) per uS */
+#define PMIC_MAX_RAMP           141U    /* Max PMIC ramp delay in us */
+#define PMIC_MAX_RAMP_RATE      7813U   /* PMIC voltage ramp (uV) per us */
 
 /* 
  * Resume from KS1 ramps VDD_MAIN 200 mV (800 mV to 1000 mV)
