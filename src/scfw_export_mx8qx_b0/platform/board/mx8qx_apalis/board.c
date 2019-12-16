@@ -68,6 +68,7 @@
 #include "drivers/sysctr/fsl_sysctr.h"
 #include "drivers/drc/fsl_drc_cbt.h"
 #include "drivers/drc/fsl_drc_derate.h"
+#include "drivers/drc/fsl_drc_rdbi_deskew.h"
 #include "pads.h"
 #include "drivers/pad/fsl_pad.h"
 #include "drivers/systick/fsl_systick.h"
@@ -383,7 +384,14 @@ board_parm_rtn_t board_parameter(board_parm_t parm)
             rtn = BOARD_PARM_RTN_INTERNAL;
             break;
         case BOARD_PARM_KS1_RESUME_USEC:
-            rtn = BOARD_KS1_RESUME_USEC;
+            if (OTP_KS1_07V_SUPPORT == 1U) /* KS1 0.7V support */
+            {
+                rtn = BOARD_KS1_07V_RESUME_USEC;
+            }
+            else
+            {
+                rtn = BOARD_KS1_RESUME_USEC;
+            }
             break;
         case BOARD_PARM_KS1_RETENTION:
             rtn = BOARD_KS1_RETENTION;
@@ -1379,7 +1387,14 @@ static void pmic_init(void)
             if (board_parameter(BOARD_PARM_KS1_RETENTION)
                 == BOARD_PARM_KS1_RETENTION_ENABLE)
             {
-                (void) PMIC_SET_VOLTAGE(PMIC_0_ADDR, PF8100_SW1, 800,
+                uint32_t ks1_volt = 800U;
+
+                if (OTP_KS1_07V_SUPPORT == 1U)
+                {
+                    ks1_volt = 700U;
+                }
+
+                (void) PMIC_SET_VOLTAGE(PMIC_0_ADDR, PF8100_SW1, ks1_volt,
                     REG_STBY_MODE);
             }
 

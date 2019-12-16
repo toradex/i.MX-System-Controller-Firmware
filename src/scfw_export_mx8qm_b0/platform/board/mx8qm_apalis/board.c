@@ -67,6 +67,7 @@
 #include "drivers/lpuart/fsl_lpuart.h"
 #include "drivers/drc/fsl_drc_cbt.h"
 #include "drivers/drc/fsl_drc_derate.h"
+#include "drivers/drc/fsl_drc_rdbi_deskew.h"
 #include "drivers/systick/fsl_systick.h"
 #include "pads.h"
 #include "drivers/pad/fsl_pad.h"

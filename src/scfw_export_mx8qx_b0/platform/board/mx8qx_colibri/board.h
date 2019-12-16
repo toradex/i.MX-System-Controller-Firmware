@@ -84,6 +84,15 @@
  * 
  */
 #define BOARD_KS1_RESUME_USEC   26U
+
+/*
+ * Resume from KS1 ramps VDD_MAIN 300 mV (700 mV to 1000 mV)
+ * PF8100 reg freq = 2.5 MHz, SWxDVS_RAMP = 0 => 7.813 mV/us
+ * 300 mV / 7.813 mV/us = 38.4 us ==> 39 us
+ *
+ */
+#define BOARD_KS1_07V_RESUME_USEC   39U
+
 #define BOARD_KS1_RETENTION     BOARD_PARM_KS1_RETENTION_ENABLE
 #define BOARD_KS1_ONOFF_WAKE    BOARD_PARM_KS1_ONOFF_WAKE_ENABLE
 
