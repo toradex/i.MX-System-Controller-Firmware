@@ -72,8 +72,8 @@
 #include "drivers/pad/fsl_pad.h"
 #include "drivers/systick/fsl_systick.h"
 
-#include "dcd/imx8dx_dcd_1.2GHz_retention.h"
-#include "dcd/imx8qx_dcd_1.2GHz_retention.h"
+#include "dcd/imx8x_ramid1_dcd_1.2GHz_retention.h"
+#include "dcd/imx8x_ramid2_dcd_1.2GHz_retention.h"
 
 /* Local Defines */
 
@@ -431,93 +431,158 @@ sc_bool_t board_rsrc_avail(sc_rsrc_t rsrc)
 }
 
 /*--------------------------------------------------------------------------*/
+/* Init DDR helpers                                                         */
+/*--------------------------------------------------------------------------*/
+
+static int board_init_ddr_get_ramid(void) {
+    int tdx2_ramid = OTP_TDX2_RAMID;
+    /*
+     * RAMID overview
+     *
+     * 0x0  Legacy RAM handling
+     * 0x1  LPDDR4 2GiB (32Mb x32DQ x8banks x2Channels)
+     *      - Colibri iMX8QXP 2GB WB IT V1.0B   (K4F6E304HB-MGCJ)
+     *      - Colibri iMX8QXP 2GB WB IT V1.0C   (K4F6E304HB-MGCJ)
+     * 0x2  LPDDR4 1GiB (32Mb x32DQ x8banks x2Channels)
+     *      - Colibri iMX8DX 1GB WB V1.0C       (MT53D512M16D1DS-046 WT:D)
+     *      - Colibri iMX8DX 1GB V1.0C          (MT53D512M16D1DS-046 WT:D)
+     *
+     * 0xF  Last RAMID, reserved to indicate RAM handling with Toradex PID8
+     */
+
+    /* Some debug prints */
+#if DEBUG_LEVEL >= 4
+    if (OTP_TDX2_BLOCK) {
+        board_print(4, "First Toradex fusing block got overwritten.\n");
+        board_print(4, "Running on a board with PID8: %08d\n", OTP_TDX2_PID8);
+        board_print(4, "OTP_TDX2_PID4_SKU | OTP_TDX2_PID4_VERS: %d | %d\n", OTP_TDX2_PID4_SKU, OTP_TDX2_PID4_VERS);
+        board_print(4, "OTP_TDX2_BLOCK: 0x%x\n", OTP_TDX2_BLOCK);
+    } else if (OTP_TDX1_BLOCK) {
+        board_print(4, "Running on a board with PID8: %08d\n", OTP_TDX1_PID8);
+        board_print(4, "OTP_TDX1_PID4_SKU | OTP_TDX1_PID4_VERS: %d | %d\n", OTP_TDX1_PID4_SKU, OTP_TDX1_PID4_VERS);
+        board_print(4, "OTP_TDX1_BLOCK: 0x%x\n", OTP_TDX1_BLOCK);
+    } else {
+        board_print(4, "Toradex fusing block not used. Handling RAM in legacy mode.\n");
+    }
+#endif
+
+    if (tdx2_ramid) {
+        board_print(4, "First RAM-Timing got overwritten, using now RAMID " \
+                       "0x%x\n", tdx2_ramid);
+        return tdx2_ramid;
+    } else {
+        board_print(4, "RAMID found: 0x%x\n", OTP_TDX1_RAMID);
+        return OTP_TDX1_RAMID;
+    }
+}
+
+static soc_ddr_ret_info_t* board_init_ddr_ramid_1(void) {
+        /*
+         * Variables for DDR retention
+         */
+        /* Storage for DRC registers */
+        static ddrc board_ddr_ret_drc_inst[BD_DDR_RET_NUM_DRC];
+
+        /* Storage for DRC PHY registers */
+        static ddr_phy board_ddr_ret_drc_phy_inst[BD_DDR_RET_NUM_DRC];
+
+        /* Storage for DDR regions */
+        static uint32_t board_ddr_ret_buf1[RAMID1_BD_DDR_RET_REGION1_SIZE];
+        #ifdef RAMID1_BD_DDR_RET_REGION2_SIZE
+        static uint32_t board_ddr_ret_buf2[RAMID1_BD_DDR_RET_REGION2_SIZE];
+        #endif
+        #ifdef RAMID1_BD_DDR_RET_REGION3_SIZE
+        static uint32_t board_ddr_ret_buf3[RAMID1_BD_DDR_RET_REGION3_SIZE];
+        #endif
+
+        /* DDR region descriptors */
+        static const soc_ddr_ret_region_t board_ddr_ret_region[RAMID1_BD_DDR_RET_NUM_REGION] =
+        {
+            { RAMID1_BD_DDR_RET_REGION1_ADDR, RAMID1_BD_DDR_RET_REGION1_SIZE, board_ddr_ret_buf1 },
+        #ifdef RAMID1_BD_DDR_RET_REGION2_SIZE
+            { RAMID1_BD_DDR_RET_REGION2_ADDR, RAMID1_BD_DDR_RET_REGION2_SIZE, board_ddr_ret_buf2 },
+        #endif
+        #ifdef RAMID1_BD_DDR_RET_REGION3_SIZE
+            { RAMID1_BD_DDR_RET_REGION3_ADDR, RAMID1_BD_DDR_RET_REGION3_SIZE, board_ddr_ret_buf3 }
+        #endif
+        };
+
+        /* DDR retention descriptor passed to SCFW */
+        static soc_ddr_ret_info_t board_ddr_ret_info_qx =
+        {
+            BD_DDR_RET_NUM_DRC, board_ddr_ret_drc_inst, board_ddr_ret_drc_phy_inst,
+            RAMID1_BD_DDR_RET_NUM_REGION, board_ddr_ret_region
+        };
+        return &board_ddr_ret_info_qx;
+}
+
+static soc_ddr_ret_info_t* board_init_ddr_ramid_2(void) {
+        /*
+         * Variables for DDR retention
+         */
+        /* Storage for DRC registers */
+        static ddrc board_ddr_ret_drc_inst[BD_DDR_RET_NUM_DRC];
+
+        /* Storage for DRC PHY registers */
+        static ddr_phy board_ddr_ret_drc_phy_inst[BD_DDR_RET_NUM_DRC];
+
+        /* Storage for DDR regions */
+        static uint32_t board_ddr_ret_buf1[RAMID2_BD_DDR_RET_REGION1_SIZE];
+        #ifdef RAMID2_BD_DDR_RET_REGION2_SIZE
+        static uint32_t board_ddr_ret_buf2[RAMID2_BD_DDR_RET_REGION2_SIZE];
+        #endif
+        #ifdef RAMID2_BD_DDR_RET_REGION3_SIZE
+        static uint32_t board_ddr_ret_buf3[RAMID2_BD_DDR_RET_REGION3_SIZE];
+        #endif
+
+        /* DDR region descriptors */
+        static const soc_ddr_ret_region_t board_ddr_ret_region[RAMID2_BD_DDR_RET_NUM_REGION] =
+        {
+            { RAMID2_BD_DDR_RET_REGION1_ADDR, RAMID2_BD_DDR_RET_REGION1_SIZE, board_ddr_ret_buf1 },
+        #ifdef RAMID2_BD_DDR_RET_REGION2_SIZE
+            { RAMID2_BD_DDR_RET_REGION2_ADDR, RAMID2_BD_DDR_RET_REGION2_SIZE, board_ddr_ret_buf2 },
+        #endif
+        #ifdef RAMID2_BD_DDR_RET_REGION3_SIZE
+            { RAMID2_BD_DDR_RET_REGION3_ADDR, RAMID2_BD_DDR_RET_REGION3_SIZE, board_ddr_ret_buf3 }
+            #endif
+        };
+
+        /* DDR retention descriptor passed to SCFW */
+        static soc_ddr_ret_info_t board_ddr_ret_info_dx =
+        {
+            BD_DDR_RET_NUM_DRC, board_ddr_ret_drc_inst, board_ddr_ret_drc_phy_inst,
+            RAMID2_BD_DDR_RET_NUM_REGION, board_ddr_ret_region
+        };
+        return &board_ddr_ret_info_dx;
+}
+
+/*--------------------------------------------------------------------------*/
 /* Init DDR                                                                 */
 /*--------------------------------------------------------------------------*/
 sc_err_t board_init_ddr(sc_bool_t early, sc_bool_t ddr_initialized)
 {
     static soc_ddr_ret_info_t* board_ddr_ret_info = NULL;
 
-    /* DX has two A35 cores disabled */
-    if (OTP_A35_DIS != 0x0) {
-        /*
-         * Variables for DDR retention
-         */
-        #ifdef DX_BD_DDR_RET
-            /* Storage for DRC registers */
-            static ddrc board_ddr_ret_drc_inst[DX_BD_DDR_RET_NUM_DRC];
-
-            /* Storage for DRC PHY registers */
-            static ddr_phy board_ddr_ret_drc_phy_inst[DX_BD_DDR_RET_NUM_DRC];
-
-            /* Storage for DDR regions */
-            static uint32_t board_ddr_ret_buf1[DX_BD_DDR_RET_REGION1_SIZE];
-            #ifdef DX_BD_DDR_RET_REGION2_SIZE
-            static uint32_t board_ddr_ret_buf2[DX_BD_DDR_RET_REGION2_SIZE];
-            #endif
-            #ifdef DX_BD_DDR_RET_REGION3_SIZE
-            static uint32_t board_ddr_ret_buf3[DX_BD_DDR_RET_REGION3_SIZE];
-            #endif
-
-            /* DDR region descriptors */
-            static const soc_ddr_ret_region_t board_ddr_ret_region[DX_BD_DDR_RET_NUM_REGION] = 
-            {
-                { DX_BD_DDR_RET_REGION1_ADDR, DX_BD_DDR_RET_REGION1_SIZE, board_ddr_ret_buf1 },
-            #ifdef DX_BD_DDR_RET_REGION2_SIZE
-                { DX_BD_DDR_RET_REGION2_ADDR, DX_BD_DDR_RET_REGION2_SIZE, board_ddr_ret_buf2 },
-            #endif
-            #ifdef DX_BD_DDR_RET_REGION3_SIZE
-                { DX_BD_DDR_RET_REGION3_ADDR, DX_BD_DDR_RET_REGION3_SIZE, board_ddr_ret_buf3 }
+    switch (board_init_ddr_get_ramid())
+    {
+        case 0x2:
+            board_ddr_ret_info = board_init_ddr_ramid_2();
+            break;
+        case 0x1:
+            board_ddr_ret_info = board_init_ddr_ramid_1();
+            break;
+        default:
+            /* legacy RAM handling */
+            if (OTP_A35_DIS != 0x0) { /* DX has two A35 cores disabled */
+                #ifdef RAMID2_BD_DDR_RET
+                    board_ddr_ret_info = board_init_ddr_ramid_2();
                 #endif
-            };
-    
-            /* DDR retention descriptor passed to SCFW */
-            static soc_ddr_ret_info_t board_ddr_ret_info_dx =
-            { 
-              DX_BD_DDR_RET_NUM_DRC, board_ddr_ret_drc_inst, board_ddr_ret_drc_phy_inst, 
-              DX_BD_DDR_RET_NUM_REGION, board_ddr_ret_region
-            };
-            board_ddr_ret_info = &board_ddr_ret_info_dx;
-        #endif
-    } else {
-        /*
-         * Variables for DDR retention
-         */
-        #ifdef QX_BD_DDR_RET
-            /* Storage for DRC registers */
-            static ddrc board_ddr_ret_drc_inst[QX_BD_DDR_RET_NUM_DRC];
-
-            /* Storage for DRC PHY registers */
-            static ddr_phy board_ddr_ret_drc_phy_inst[QX_BD_DDR_RET_NUM_DRC];
-
-            /* Storage for DDR regions */
-            static uint32_t board_ddr_ret_buf1[QX_BD_DDR_RET_REGION1_SIZE];
-            #ifdef QX_BD_DDR_RET_REGION2_SIZE
-            static uint32_t board_ddr_ret_buf2[QX_BD_DDR_RET_REGION2_SIZE];
-            #endif
-            #ifdef QX_BD_DDR_RET_REGION3_SIZE
-            static uint32_t board_ddr_ret_buf3[QX_BD_DDR_RET_REGION3_SIZE];
-            #endif
-
-            /* DDR region descriptors */
-            static const soc_ddr_ret_region_t board_ddr_ret_region[QX_BD_DDR_RET_NUM_REGION] = 
-            {
-                { QX_BD_DDR_RET_REGION1_ADDR, QX_BD_DDR_RET_REGION1_SIZE, board_ddr_ret_buf1 },
-            #ifdef QX_BD_DDR_RET_REGION2_SIZE
-                { QX_BD_DDR_RET_REGION2_ADDR, QX_BD_DDR_RET_REGION2_SIZE, board_ddr_ret_buf2 },
-            #endif
-            #ifdef QX_BD_DDR_RET_REGION3_SIZE
-                { QX_BD_DDR_RET_REGION3_ADDR, QX_BD_DDR_RET_REGION3_SIZE, board_ddr_ret_buf3 }
-            #endif
-            };
-
-            /* DDR retention descriptor passed to SCFW */
-            static soc_ddr_ret_info_t board_ddr_ret_info_qx =
-            {
-              QX_BD_DDR_RET_NUM_DRC, board_ddr_ret_drc_inst, board_ddr_ret_drc_phy_inst, 
-              QX_BD_DDR_RET_NUM_REGION, board_ddr_ret_region
-            };
-            board_ddr_ret_info = &board_ddr_ret_info_qx;
-        #endif
+            } else {
+                #ifdef RAMID1_BD_DDR_RET
+                    board_ddr_ret_info = board_init_ddr_ramid_1();
+                #endif
+            }
+            break;
     }
 
     board_print(3, "board_init_ddr(%d)\n", early);
@@ -535,7 +600,7 @@ sc_err_t board_init_ddr(sc_bool_t early, sc_bool_t ddr_initialized)
             board_print(1, "SCFW: ");
             err = board_ddr_config(SC_FALSE, BOARD_DDR_COLD_INIT);
             #ifdef LP4_MANUAL_DERATE_WORKAROUND
-                ddrc_lpddr4_derate_init(QX_BD_DDR_RET_NUM_DRC);
+                ddrc_lpddr4_derate_init(BD_DDR_RET_NUM_DRC);
             #endif
         }
 
@@ -603,16 +668,16 @@ sc_err_t  board_ddr_config(bool rom_caller, board_ddr_action_t action)
             board_ddr_derate_periodic_enable(SC_FALSE);
     #endif
             board_ddr_periodic_enable(SC_FALSE);
-    #ifdef QX_BD_DDR_RET
+    #if defined RAMID1_BD_DDR_RET || defined RAMID2_BD_DDR_RET
             soc_ddr_enter_retention();
     #endif
             break;
         case BOARD_DDR_SR_DRC_OFF_EXIT:
-    #ifdef QX_BD_DDR_RET
+    #if defined RAMID1_BD_DDR_RET || defined RAMID2_BD_DDR_RET
             soc_ddr_exit_retention();
     #endif
     #ifdef LP4_MANUAL_DERATE_WORKAROUND
-            ddrc_lpddr4_derate_init(QX_BD_DDR_RET_NUM_DRC);
+            ddrc_lpddr4_derate_init(BD_DDR_RET_NUM_DRC);
             board_ddr_derate_periodic_enable(SC_TRUE);
     #endif
     #ifdef BD_LPDDR4_INC_DQS2DQ
@@ -630,7 +695,7 @@ sc_err_t  board_ddr_config(bool rom_caller, board_ddr_action_t action)
         case BOARD_DDR_SR_DRC_ON_EXIT:
             soc_refresh_power_down_clk_disable_exit();
     #ifdef LP4_MANUAL_DERATE_WORKAROUND
-            ddrc_lpddr4_derate_init(QX_BD_DDR_RET_NUM_DRC);
+            ddrc_lpddr4_derate_init(BD_DDR_RET_NUM_DRC);
             board_ddr_derate_periodic_enable(SC_TRUE);
     #endif
     #ifdef BD_LPDDR4_INC_DQS2DQ
@@ -646,7 +711,7 @@ sc_err_t  board_ddr_config(bool rom_caller, board_ddr_action_t action)
             break;
         case BOARD_DDR_PERIODIC_RESTART:
     #ifdef LP4_MANUAL_DERATE_WORKAROUND
-            ddrc_lpddr4_derate_init(QX_BD_DDR_RET_NUM_DRC);
+            ddrc_lpddr4_derate_init(BD_DDR_RET_NUM_DRC);
             board_ddr_derate_periodic_enable(SC_TRUE);
     #endif
     #ifdef BD_LPDDR4_INC_DQS2DQ
@@ -656,7 +721,7 @@ sc_err_t  board_ddr_config(bool rom_caller, board_ddr_action_t action)
             break;
     #ifdef LP4_MANUAL_DERATE_WORKAROUND
         case BOARD_DDR_DERATE_PERIODIC:
-            polling = ddrc_lpddr4_derate_periodic(QX_BD_DDR_RET_NUM_DRC);
+            polling = ddrc_lpddr4_derate_periodic(BD_DDR_RET_NUM_DRC);
             if (polling != SC_TRUE)
             {
                 board_ddr_derate_periodic_enable(SC_FALSE);
@@ -664,11 +729,22 @@ sc_err_t  board_ddr_config(bool rom_caller, board_ddr_action_t action)
             break;
     #endif
         default:
-           /* DX has two A35 cores disabled */
-            if (OTP_A35_DIS != 0x0) {
-                #include "dcd/imx8dx_dcd_1.2GHz.h"
-            } else {
-                #include "dcd/imx8qx_dcd_1.2GHz.h"
+            switch (board_init_ddr_get_ramid())
+            {
+                case 0x2:
+                    #include "dcd/imx8x_ramid2_dcd_1.2GHz.h"
+                    break;
+                case 0x1:
+                    #include "dcd/imx8x_ramid1_dcd_1.2GHz.h"
+                    break;
+                default:
+                    /* legacy RAM handling */
+                    if (OTP_A35_DIS != 0x0) { /* DX has two A35 cores disabled */
+                        #include "dcd/imx8x_ramid2_dcd_1.2GHz.h"
+                    } else {
+                        #include "dcd/imx8x_ramid1_dcd_1.2GHz.h"
+                    }
+                    break;
             }
             break;
     }

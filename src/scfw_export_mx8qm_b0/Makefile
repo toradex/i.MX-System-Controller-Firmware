@@ -419,10 +419,10 @@ $(SRC)/board/$(CONFIG)_$(B)/dcd/%.h : $(SRC)/board/$(CONFIG)_$(B)/dcd/%.cfg
 	$(AT)rm -f $(*F).temp
 	$(AT)${CPP} -P -I$(SRC)/devices $< $(*F).temp
 	$(AT)sed -i -f bin/dcd.sed $(*F).temp
-	$(AT)echo "#ifndef $(subst .,_,$(*F))_H" > $@
-	$(AT)echo "#define $(subst .,_,$(*F))_H" >> $@
+#	$(AT)echo "#ifndef $(subst .,_,$(*F))_H" > $@
+#	$(AT)echo "#define $(subst .,_,$(*F))_H" >> $@
 	$(AT)cat $(*F).temp >> $@
-	$(AT)echo '#endif' >> $@
+#	$(AT)echo '#endif' >> $@
 	$(AT)rm -f $(*F).temp
 
 $(SRC)/board/$(CONFIG)_$(B)/dcd/dcd.h : $(SRC)/board/$(CONFIG)_$(B)/dcd/$(DDR_CON).h
