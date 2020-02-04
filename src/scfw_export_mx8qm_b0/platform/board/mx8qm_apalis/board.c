@@ -1146,31 +1146,27 @@ sc_err_t board_trans_resource_power(sc_rm_idx_t idx, sc_rm_idx_t rsrc_idx,
     {
         switch (idx)
         {
-            case BRD_R_BOARD_R0 : /* PTN5150 (use SC_R_BOARD_R0) */
+            case BRD_R_BOARD_R0 : /* Apalis ethernet PHY power rail */
                 if (to_mode > SC_PM_PW_MODE_OFF)
                 {
-                    (void) PMIC_SET_VOLTAGE(PMIC_1_ADDR, PF8100_LDO1,
+                    /* KSZ 9031 power-up sequence */
+                    (void) PMIC_SET_VOLTAGE(PMIC_0_ADDR, PF8100_LDO4,
                         3300, REG_RUN_MODE);
-                    (void) PMIC_SET_MODE(PMIC_1_ADDR, PF8100_LDO1,
+                    (void) PMIC_SET_MODE(PMIC_0_ADDR, PF8100_LDO4,
+                        RUN_EN_STBY_EN);
+
+                    (void) PMIC_SET_VOLTAGE(PMIC_1_ADDR, PF8100_SW7,
+                        1200, REG_RUN_MODE);
+                    (void) PMIC_SET_MODE(PMIC_1_ADDR, PF8100_SW7,
                         RUN_EN_STBY_EN);
                 }
                 else
                 {
-                    (void) PMIC_SET_MODE(PMIC_1_ADDR, PF8100_LDO1,
+                    /* KSZ 9031 power-down sequence */
+                    (void) PMIC_SET_MODE(PMIC_1_ADDR, PF8100_SW7,
                         RUN_OFF_STBY_OFF);
-                }
-                break;
-            case BRD_R_BOARD_R2 : /* HSIC (use SC_R_BOARD_R2) */
-                if (to_mode > SC_PM_PW_MODE_OFF)
-                {
-                    (void) PMIC_SET_VOLTAGE(PMIC_1_ADDR, PF8100_SW7, 1200,
-                                        REG_RUN_MODE);
-                    (void) PMIC_SET_MODE(PMIC_1_ADDR, PF8100_SW7,
-                        RUN_EN_STBY_EN);
-                }
-                else
-                {
-                    (void) PMIC_SET_MODE(PMIC_1_ADDR, PF8100_SW7,
+
+                    (void) PMIC_SET_MODE(PMIC_0_ADDR, PF8100_LDO4,
                         RUN_OFF_STBY_OFF);
                 }
                 break;
