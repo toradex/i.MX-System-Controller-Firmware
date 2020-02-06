@@ -1170,6 +1170,41 @@ sc_err_t board_trans_resource_power(sc_rm_idx_t idx, sc_rm_idx_t rsrc_idx,
                         RUN_OFF_STBY_OFF);
                 }
                 break;
+            case BRD_R_BOARD_R1 : /* Apalis external RGMII interface in 3.3V */
+                if (to_mode > SC_PM_PW_MODE_OFF)
+                {
+                    /*
+                     * We set 5V here so the LDO1 runs in load switch (LS) mode
+                     * so the output voltage follows exactly the input voltage
+                     * that is the module supply voltage, 3.3V.
+                     * This is needed because this LDO is fused to run in normal
+                     * mode and not like PMIC_0_ADDR, PF8100_LDO4 in LS mode
+                     */
+                    (void) PMIC_SET_VOLTAGE(PMIC_1_ADDR, PF8100_LDO1,
+                        5000, REG_RUN_MODE);
+                    (void) PMIC_SET_MODE(PMIC_1_ADDR, PF8100_LDO1,
+                        RUN_EN_STBY_EN);
+                }
+                else
+                {
+                    (void) PMIC_SET_MODE(PMIC_1_ADDR, PF8100_LDO1,
+                        RUN_OFF_STBY_OFF);
+                }
+                break;
+            case BRD_R_BOARD_R2 : /* Apalis external RGMII interface in 1.8V */
+                if (to_mode > SC_PM_PW_MODE_OFF)
+                {
+                    (void) PMIC_SET_VOLTAGE(PMIC_1_ADDR, PF8100_LDO1,
+                        1800, REG_RUN_MODE);
+                    (void) PMIC_SET_MODE(PMIC_1_ADDR, PF8100_LDO1,
+                        RUN_EN_STBY_EN);
+                }
+                else
+                {
+                    (void) PMIC_SET_MODE(PMIC_1_ADDR, PF8100_LDO1,
+                        RUN_OFF_STBY_OFF);
+                }
+                break;
             default :
                 err = SC_ERR_PARM;
                 break;
