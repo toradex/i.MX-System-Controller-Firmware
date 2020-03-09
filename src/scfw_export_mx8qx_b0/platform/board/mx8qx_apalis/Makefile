@@ -6,7 +6,9 @@ ifneq ($(HW), SIMU)
 endif
 
 DCDH += $(SRC)/board/mx8qx_$(B)/dcd/imx8x_ramid1_dcd_933MHz.h \
-	$(SRC)/board/mx8qx_$(B)/dcd/imx8x_ramid1_dcd_933MHz_retention.h
+	$(SRC)/board/mx8qx_$(B)/dcd/imx8x_ramid1_dcd_933MHz_retention.h \
+	$(SRC)/board/mx8qx_$(B)/dcd/imx8x_ramid2_dcd_933MHz.h \
+	$(SRC)/board/mx8qx_$(B)/dcd/imx8x_ramid2_dcd_933MHz_retention.h
 
 RSRC_MD += $(SRC)/board/mx8qx_$(B)/resource.txt
 

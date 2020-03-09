@@ -74,6 +74,7 @@
 #include "drivers/systick/fsl_systick.h"
 
 #include "dcd/imx8x_ramid1_dcd_933MHz_retention.h"
+#include "dcd/imx8x_ramid2_dcd_933MHz_retention.h"
 
 /* Local Defines */
 
@@ -440,11 +441,13 @@ static int board_init_ddr_get_ramid(void) {
      * RAMID overview
      *
      * 0x0  Legacy RAM handling
-     * 0x1  DDR3L 2GiB ECC (DDR3L IT 512Mx16 1866MT/s)
-     *      - Apalis iMX8QXP 2GB ECC WB IT V1.0A (PROTOTYPE)    (MT41K512M16VRN-107 IT:P)
-     *      - Apalis iMX8QXP 2GB ECC IT V1.0A                   (MT41K512M16VRN-107 IT:P)
-     * 0x2  DDR3L 2GiB non-ECC (DDR3L IT 512Mx16 1866MT/s)
+     * 0x1  DDR3L 2GiB non-ECC (DDR3L IT 512Mx16 1866MT/s)
      *      - Apalis iMX8QXP 2GB WB IT V1.0A                    (MT41K512M16VRN-107 IT:P)
+     *      - Apalis iMX8QXP 2GB WB IT V1.1A                    (MT41K512M16VRN-107 IT:P)
+     * 0x2  DDR3L 2GiB ECC (DDR3L IT 512Mx16 1866MT/s)
+     *      - Apalis iMX8QXP 2GB ECC IT V1.0A                   (MT41K512M16VRN-107 IT:P)
+     *      - Apalis iMX8QXP 2GB ECC IT V1.1A                   (MT41K512M16VRN-107 IT:P)
+     *      - Apalis iMX8QXP 2GB ECC WB IT V1.0A (PROTOTYPE)    (MT41K512M16VRN-107 IT:P)
      *
      * 0xF  Last RAMID, reserved to indicate RAM handling with Toradex PID8
      */
@@ -515,16 +518,15 @@ static soc_ddr_ret_info_t* board_init_ddr_ramid_1(void) {
         return &board_ddr_ret_info_qx;
 }
 
-#if 0 /* Todo implement for Apalis iMX8X DualX */
 static soc_ddr_ret_info_t* board_init_ddr_ramid_2(void) {
         /*
          * Variables for DDR retention
          */
         /* Storage for DRC registers */
-        static ddrc board_ddr_ret_drc_inst[RAMID2_BD_DDR_RET_NUM_DRC];
+        static ddrc board_ddr_ret_drc_inst[BD_DDR_RET_NUM_DRC];
 
         /* Storage for DRC PHY registers */
-        static ddr_phy board_ddr_ret_drc_phy_inst[RAMID2_BD_DDR_RET_NUM_DRC];
+        static ddr_phy board_ddr_ret_drc_phy_inst[BD_DDR_RET_NUM_DRC];
 
         /* Storage for DDR regions */
         static uint32_t board_ddr_ret_buf1[RAMID2_BD_DDR_RET_REGION1_SIZE];
@@ -550,12 +552,11 @@ static soc_ddr_ret_info_t* board_init_ddr_ramid_2(void) {
         /* DDR retention descriptor passed to SCFW */
         static soc_ddr_ret_info_t board_ddr_ret_info_dx =
         {
-            RAMID2_BD_DDR_RET_NUM_DRC, board_ddr_ret_drc_inst, board_ddr_ret_drc_phy_inst,
+            BD_DDR_RET_NUM_DRC, board_ddr_ret_drc_inst, board_ddr_ret_drc_phy_inst,
             RAMID2_BD_DDR_RET_NUM_REGION, board_ddr_ret_region
         };
         return &board_ddr_ret_info_dx;
 }
-#endif
 
 /*--------------------------------------------------------------------------*/
 /* Init DDR                                                                 */
@@ -733,12 +734,8 @@ sc_err_t  board_ddr_config(bool rom_caller, board_ddr_action_t action)
             switch (board_init_ddr_get_ramid())
             {
                 case 0x2:
-/*
- * ramid2 is not yet tested, but another SoM with another RAM is in the pipeline
- * so this is prepared here but commented out.
- */
-//                    #include "dcd/imx8x_ramid2_dcd_933MHz.h"
-//                    break;
+                    #include "dcd/imx8x_ramid2_dcd_933MHz.h"
+                    break;
                 case 0x1:
                     #include "dcd/imx8x_ramid1_dcd_933MHz.h"
                     break;
