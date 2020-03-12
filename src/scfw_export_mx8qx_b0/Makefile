@@ -1,6 +1,38 @@
+## ###################################################################
+##
+##     Copyright 2019 NXP
+##
+##     Redistribution and use in source and binary forms, with or without modification,
+##     are permitted provided that the following conditions are met:
+##
+##     o Redistributions of source code must retain the above copyright notice, this list
+##       of conditions and the following disclaimer.
+##
+##     o Redistributions in binary form must reproduce the above copyright notice, this
+##       list of conditions and the following disclaimer in the documentation and/or
+##       other materials provided with the distribution.
+##
+##     o Neither the name of the copyright holder nor the names of its
+##       contributors may be used to endorse or promote products derived from this
+##       software without specific prior written permission.
+##
+##     THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+##     ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+##     WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+##     DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+##     ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+##     (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+##     LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+##     ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+##     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+##     SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+##
+##
+## ###################################################################
+
 # This Makefile will build the System Controller and Test
 
-SHELL = /bin/sh
+SHELL=/bin/bash -o pipefail
 
 # Configure Si Rev
 DEF_SREV := B0
@@ -36,7 +68,7 @@ OUT ?= build_api
 HW ?= SIMU
 PROJ ?= ""
 SREC_OFFSET ?= 0x00000000
-
+DOXYGEN ?= doxygen
 DOX_OUT = $(OUT)/docs
 FLAGS += -DCPU_$(DEVICE) $(OPT) -DECC_CLEAN
 
@@ -73,8 +105,11 @@ endif
 ifeq ($(HW), SIMU)
     override B := none
 endif
+ifndef DEF_B
+    DEF_B := val
+endif
 ifndef B
-    B := val
+    B := $(DEF_B)
 endif
 LOWER_B := $(shell echo $(B) | tr A-Z a-z)
 export B
@@ -160,7 +195,11 @@ endif
 ifndef U
     U = 0
 endif
-FLAGS += -DDEBUG_UART=$(U)
+ifeq ($(D),0)
+	FLAGS += -DDEBUG_UART=0
+else
+	FLAGS += -DDEBUG_UART=$(U)
+endif
 
 # Configure MSI posted writes
 ifdef w
@@ -203,6 +242,10 @@ ifeq ($(EM),1)
 	FLAGS += -DEXPORT_MONITOR
 endif
 
+ifdef NO_OVLY
+	FLAGS += -DNO_OVLY
+endif
+
 # Check config
 ifeq ($(D),0)
 ifeq ($(M),1)
@@ -214,7 +257,7 @@ WARNS = -Wall -Wextra -Wno-missing-braces -Wno-missing-field-initializers \
     -Wfloat-equal -Wswitch-default -Wcast-align \
     -Wpointer-arith -Wredundant-decls -Wbad-function-cast -Wstrict-prototypes \
     -Wundef -Wcast-qual -Wshadow \
-    -Wold-style-definition -Wno-unused-parameter -Werror
+    -Wold-style-definition -Wno-unused-parameter -Werror -Wstack-usage=1024
 
 # Set common flags
 rootdir := $(CURDIR)
@@ -369,6 +412,10 @@ endif
 ifeq ($(LOWER_T),all)
 	TCM_LD = $(SRC)/devices/$(DEVICE)/linker/gcc/$(DEVICE)_overlay.ld
 else
+	TCM_LD = $(SRC)/devices/$(DEVICE)/linker/gcc/$(DEVICE)_tcm.ld
+endif
+
+ifdef NO_OVLY
 	TCM_LD = $(SRC)/devices/$(DEVICE)/linker/gcc/$(DEVICE)_tcm.ld
 endif
 

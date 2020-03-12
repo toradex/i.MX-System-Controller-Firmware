@@ -2,7 +2,7 @@
 ** ###################################################################
 **
 **     Copyright (c) 2016 Freescale Semiconductor, Inc.
-**     Copyright 2017-2018 NXP
+**     Copyright 2017-2019 NXP
 **
 **     Redistribution and use in source and binary forms, with or without modification,
 **     are permitted provided that the following conditions are met:
@@ -50,8 +50,6 @@
 
 /* Defines */
 
-#define SCFW_API_VERSION            100U
-
 /*!
  * @name Defines for common frequencies
  */
@@ -72,6 +70,7 @@
 #define SC_83MHZ         83333333U   /*!< 83MHz */
 #define SC_84MHZ         84375000U   /*!< 84.37MHz */
 #define SC_100MHZ       100000000U   /*!< 100MHz */
+#define SC_114MHZ       114000000U   /*!< 114MHz */
 #define SC_125MHZ       125000000U   /*!< 125MHz */
 #define SC_133MHZ       133333333U   /*!< 133MHz */
 #define SC_135MHZ       135000000U   /*!< 135MHz */
@@ -92,6 +91,7 @@
 #define SC_372MHZ       372000000U   /*!< 372MHz */
 #define SC_375MHZ       375000000U   /*!< 375MHz */
 #define SC_400MHZ       400000000U   /*!< 400MHz */
+#define SC_465MHZ       465000000U   /*!< 465MHz */
 #define SC_500MHZ       500000000U   /*!< 500MHz */
 #define SC_594MHZ       594000000U   /*!< 594MHz */
 #define SC_625MHZ       625000000U   /*!< 625MHz */
@@ -127,6 +127,7 @@
 #define SC_1500MHZ     1500000000U   /*!< 1.5GHz */
 #define SC_1600MHZ     1600000000U   /*!< 1.6GHz */
 #define SC_1800MHZ     1800000000U   /*!< 1.8GHz */
+#define SC_1860MHZ     1860000000U   /*!< 1.86GHz */
 #define SC_2000MHZ     2000000000U   /*!< 2.0GHz */
 #define SC_2112MHZ     2112000000U   /*!< 2.12GHz */
 /*@}*/
@@ -145,6 +146,7 @@
 #define SC_144MHZ       144000000U   /*!< 144MHz */
 #define SC_192MHZ       192000000U   /*!< 192MHz */
 #define SC_211MHZ       211200000U   /*!< 211.2MHz */
+#define SC_228MHZ       228000000U   /*!< 233MHz */
 #define SC_240MHZ       240000000U   /*!< 240MHz */
 #define SC_264MHZ       264000000U   /*!< 264MHz */
 #define SC_352MHZ       352000000U   /*!< 352MHz */
@@ -152,11 +154,13 @@
 #define SC_384MHZ       384000000U   /*!< 384MHz */
 #define SC_396MHZ       396000000U   /*!< 396MHz */
 #define SC_432MHZ       432000000U   /*!< 432MHz */
+#define SC_456MHZ       456000000U   /*!< 466MHz */
 #define SC_480MHZ       480000000U   /*!< 480MHz */
 #define SC_600MHZ       600000000U   /*!< 600MHz */
 #define SC_744MHZ       744000000U   /*!< 744MHz */
 #define SC_792MHZ       792000000U   /*!< 792MHz */
 #define SC_864MHZ       864000000U   /*!< 864MHz */
+#define SC_912MHZ       912000000U   /*!< 912MHz */
 #define SC_960MHZ       960000000U   /*!< 960MHz */
 #define SC_1056MHZ     1056000000U   /*!< 1056MHz */
 #define SC_1104MHZ     1104000000U   /*!< 1104MHz */
@@ -238,14 +242,14 @@
 #define SC_R_DC_0_BLIT2           21U
 #define SC_R_DC_0_BLIT_OUT        22U
 #define SC_R_PERF                 23U
-#define SC_R_UNUSED5              24U
+#define SC_R_USB_1_PHY            24U
 #define SC_R_DC_0_WARP            25U
-#define SC_R_UNUSED7              26U
-#define SC_R_UNUSED8              27U
+#define SC_R_V2X_MU_0             26U
+#define SC_R_V2X_MU_1             27U
 #define SC_R_DC_0_VIDEO0          28U
 #define SC_R_DC_0_VIDEO1          29U
 #define SC_R_DC_0_FRAC0           30U
-#define SC_R_UNUSED6              31U
+#define SC_R_V2X_MU_2             31U
 #define SC_R_DC_0                 32U
 #define SC_R_GPU_2_PID0           33U
 #define SC_R_DC_0_PLL_0           34U
@@ -254,11 +258,11 @@
 #define SC_R_DC_1_BLIT1           37U
 #define SC_R_DC_1_BLIT2           38U
 #define SC_R_DC_1_BLIT_OUT        39U
-#define SC_R_UNUSED9              40U
-#define SC_R_UNUSED10             41U
+#define SC_R_V2X_MU_3             40U
+#define SC_R_V2X_MU_4             41U
 #define SC_R_DC_1_WARP            42U
-#define SC_R_UNUSED11             43U
-#define SC_R_UNUSED12             44U
+#define SC_R_TBU_CTL              43U
+#define SC_R_SECVIO               44U
 #define SC_R_DC_1_VIDEO0          45U
 #define SC_R_DC_1_VIDEO1          46U
 #define SC_R_DC_1_FRAC0           47U
@@ -354,10 +358,10 @@
 #define SC_R_DMA_1_CH29           137U
 #define SC_R_DMA_1_CH30           138U
 #define SC_R_DMA_1_CH31           139U
-#define SC_R_UNUSED1              140U
-#define SC_R_UNUSED2              141U
-#define SC_R_UNUSED3              142U
-#define SC_R_UNUSED4              143U
+#define SC_R_V2X_PID0             140U
+#define SC_R_V2X_PID1             141U
+#define SC_R_V2X_PID2             142U
+#define SC_R_V2X_PID3             143U
 #define SC_R_GPU_0_PID0           144U
 #define SC_R_GPU_0_PID1           145U
 #define SC_R_GPU_0_PID2           146U
@@ -504,8 +508,8 @@
 #define SC_R_M4_0_UART            287U
 #define SC_R_M4_0_I2C             288U
 #define SC_R_M4_0_INTMUX          289U
-#define SC_R_UNUSED15             290U
-#define SC_R_UNUSED16             291U
+#define SC_R_ENET_0_A0            290U
+#define SC_R_ENET_0_A1            291U
 #define SC_R_M4_0_MU_0B           292U
 #define SC_R_M4_0_MU_0A0          293U
 #define SC_R_M4_0_MU_0A1          294U
@@ -580,12 +584,12 @@
 #define SC_R_VPU_PID5             363U
 #define SC_R_VPU_PID6             364U
 #define SC_R_VPU_PID7             365U
-#define SC_R_VPU_UART             366U
-#define SC_R_VPUCORE              367U
-#define SC_R_VPUCORE_0            368U
-#define SC_R_VPUCORE_1            369U
-#define SC_R_VPUCORE_2            370U
-#define SC_R_VPUCORE_3            371U
+#define SC_R_ENET_0_A2            366U
+#define SC_R_ENET_1_A0            367U
+#define SC_R_ENET_1_A1            368U
+#define SC_R_ENET_1_A2            369U
+#define SC_R_ENET_1_A3            370U
+#define SC_R_ENET_1_A4            371U
 #define SC_R_DMA_4_CH0            372U
 #define SC_R_DMA_4_CH1            373U
 #define SC_R_DMA_4_CH2            374U
@@ -831,9 +835,11 @@
 #define SC_C_IPG_STOP_MODE              53U
 #define SC_C_IPG_STOP_ACK               54U
 #define SC_C_SYNC_CTRL                  55U
-#define SC_C_PMIC_I2C                   56U
-#define SC_C_PMIC_I2C_READ_REG          57U
-#define SC_C_LAST                       58U
+#define SC_C_OFS_AUDIO_ALT              56U
+#define SC_C_DSP_BYP                    57U
+#define SC_C_PMIC_I2C                   58U
+#define SC_C_PMIC_I2C_READ_REG          59U
+#define SC_C_LAST                       60U
 
 #define SC_P_ALL        ((sc_pad_t) UINT16_MAX)   /*!< All pads */
 
