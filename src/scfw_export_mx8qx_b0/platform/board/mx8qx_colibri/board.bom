@@ -34,3 +34,6 @@ DRV2 +=                 \
         pmic            \
         pmic/pf8100
 
+ifeq ($(M),1)
+        DRV2 += pmic/pf100
+endif
