@@ -3,7 +3,7 @@
 **
 **     Copyright (c) 2016 Freescale Semiconductor, Inc.
 **     Copyright 2017-2019 NXP
-**     Copyright 2019 Toradex
+**     Copyright 2019-2020 Toradex
 **
 **     Redistribution and use in source and binary forms, with or without modification,
 **     are permitted provided that the following conditions are met:
@@ -455,6 +455,7 @@ static int board_init_ddr_get_ramid(void) {
      *      - Apalis iMX8QXP 2GB ECC WB IT V1.0A (PROTOTYPE)    (MT41K512M16VRN-107 IT:P)
      *
      * 0xF  Last RAMID, reserved to indicate RAM handling with Toradex PID8
+     * Note: V1.1B and later use C0/C1 SoC silicon requiring different SECO firmware!
      */
 
     /* Some debug prints */
@@ -517,8 +518,8 @@ static soc_ddr_ret_info_t* board_init_ddr_ramid_1(void) {
         /* DDR retention descriptor passed to SCFW */
         static soc_ddr_ret_info_t board_ddr_ret_info_qx =
         {
-        BD_DDR_RET_NUM_DRC, board_ddr_ret_drc_inst, board_ddr_ret_drc_phy_inst,
-        RAMID1_BD_DDR_RET_NUM_REGION, board_ddr_ret_region
+            BD_DDR_RET_NUM_DRC, board_ddr_ret_drc_inst, board_ddr_ret_drc_phy_inst,
+            RAMID1_BD_DDR_RET_NUM_REGION, board_ddr_ret_region
         };
         return &board_ddr_ret_info_qx;
 }
@@ -568,13 +569,13 @@ static soc_ddr_ret_info_t* board_init_ddr_ramid_2(void) {
 /*--------------------------------------------------------------------------*/
 sc_err_t board_init_ddr(sc_bool_t early, sc_bool_t ddr_initialized)
 {
-    static soc_ddr_ret_info_t* board_ddr_ret_info = NULL;
+    static soc_ddr_ret_info_t *board_ddr_ret_info = NULL;
 
     switch (board_init_ddr_get_ramid())
     {
         case 0x2:
             #if defined(RAMID2_BD_DDR_RET) & !defined(SKIP_DDR)
-                //board_ddr_ret_info = board_init_ddr_ramid_2();
+                board_ddr_ret_info = board_init_ddr_ramid_2();
             #endif
             break;
         case 0x1:

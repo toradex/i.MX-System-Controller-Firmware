@@ -39,8 +39,10 @@ endif
 
 DCDH += $(SRC)/board/mx8qx_$(B)/dcd/imx8x_ramid1_dcd_1.2GHz.h \
 	$(SRC)/board/mx8qx_$(B)/dcd/imx8x_ramid2_dcd_1.2GHz.h \
+	$(SRC)/board/mx8qx_$(B)/dcd/imx8x_ramid3_dcd_1.2GHz.h \
 	$(SRC)/board/mx8qx_$(B)/dcd/imx8x_ramid1_dcd_1.2GHz_retention.h \
-	$(SRC)/board/mx8qx_$(B)/dcd/imx8x_ramid2_dcd_1.2GHz_retention.h
+	$(SRC)/board/mx8qx_$(B)/dcd/imx8x_ramid2_dcd_1.2GHz_retention.h \
+	$(SRC)/board/mx8qx_$(B)/dcd/imx8x_ramid3_dcd_1.2GHz_retention.h
 
 RSRC_MD += $(SRC)/board/mx8qx_$(B)/resource.txt
 
