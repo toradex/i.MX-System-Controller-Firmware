@@ -75,6 +75,7 @@
 
 #include "dcd/imx8_ramid1_dcd_1.6GHz_retention.h"
 #include "dcd/imx8_ramid2_dcd_1.6GHz_retention.h"
+#include "dcd/imx8_ramid3_dcd_1.6GHz_retention.h"
 
 /* Local Defines */
 
@@ -618,6 +619,64 @@ static soc_ddr_ret_info_t* board_init_ddr_ramid_2(void) {
     return &board_ddr_ret_info_qp;
 }
 
+static soc_ddr_ret_info_t* board_init_ddr_ramid_3(void) {
+    /*
+     * Variables for DDR retention
+     */
+    /* Storage for DRC registers */
+    static ddrc board_ddr_ret_drc_inst[BD_DDR_RET_NUM_DRC];
+
+    /* Storage for DRC PHY registers */
+    static ddr_phy board_ddr_ret_drc_phy_inst[BD_DDR_RET_NUM_DRC];
+
+    /* Storage for DDR regions */
+    static uint32_t board_ddr_ret_buf1[RAMID3_BD_DDR_RET_REGION1_SIZE];
+    #ifdef RAMID3_BD_DDR_RET_REGION2_SIZE
+    static uint32_t board_ddr_ret_buf2[RAMID3_BD_DDR_RET_REGION2_SIZE];
+    #endif
+    #ifdef RAMID3_BD_DDR_RET_REGION3_SIZE
+    static uint32_t board_ddr_ret_buf3[RAMID3_BD_DDR_RET_REGION3_SIZE];
+    #endif
+    #ifdef RAMID3_BD_DDR_RET_REGION4_SIZE
+    static uint32_t board_ddr_ret_buf4[RAMID3_BD_DDR_RET_REGION4_SIZE];
+    #endif
+    #ifdef RAMID3_BD_DDR_RET_REGION5_SIZE
+    static uint32_t board_ddr_ret_buf5[RAMID3_BD_DDR_RET_REGION5_SIZE];
+    #endif
+    #ifdef RAMID3_BD_DDR_RET_REGION6_SIZE
+    static uint32_t board_ddr_ret_buf6[RAMID3_BD_DDR_RET_REGION6_SIZE];
+    #endif
+
+    /* DDR region descriptors */
+    static const soc_ddr_ret_region_t board_ddr_ret_region[RAMID3_BD_DDR_RET_NUM_REGION] =
+    {
+        { RAMID3_BD_DDR_RET_REGION1_ADDR, RAMID3_BD_DDR_RET_REGION1_SIZE, board_ddr_ret_buf1 },
+    #ifdef RAMID3_BD_DDR_RET_REGION2_SIZE
+        { RAMID3_BD_DDR_RET_REGION2_ADDR, RAMID3_BD_DDR_RET_REGION2_SIZE, board_ddr_ret_buf2 },
+    #endif
+    #ifdef RAMID3_BD_DDR_RET_REGION3_SIZE
+        { RAMID3_BD_DDR_RET_REGION3_ADDR, RAMID3_BD_DDR_RET_REGION3_SIZE, board_ddr_ret_buf3 },
+    #endif
+    #ifdef RAMID3_BD_DDR_RET_REGION4_SIZE
+        { RAMID3_BD_DDR_RET_REGION4_ADDR, RAMID3_BD_DDR_RET_REGION4_SIZE, board_ddr_ret_buf4 },
+    #endif
+    #ifdef RAMID3_BD_DDR_RET_REGION5_SIZE
+        { RAMID3_BD_DDR_RET_REGION5_ADDR, RAMID3_BD_DDR_RET_REGION5_SIZE, board_ddr_ret_buf5 },
+    #endif
+    #ifdef RAMID3_BD_DDR_RET_REGION6_SIZE
+        { RAMID3_BD_DDR_RET_REGION6_ADDR, RAMID3_BD_DDR_RET_REGION6_SIZE, board_ddr_ret_buf6 }
+    #endif
+    };
+
+    /* DDR retention descriptor passed to SCFW */
+    static soc_ddr_ret_info_t board_ddr_ret_info_qp =
+    {
+        BD_DDR_RET_NUM_DRC, board_ddr_ret_drc_inst, board_ddr_ret_drc_phy_inst,
+        RAMID3_BD_DDR_RET_NUM_REGION, board_ddr_ret_region
+    };
+    return &board_ddr_ret_info_qp;
+}
+
 /*--------------------------------------------------------------------------*/
 /* Init DDR                                                                 */
 /*--------------------------------------------------------------------------*/
@@ -627,6 +686,11 @@ sc_err_t board_init_ddr(sc_bool_t early, sc_bool_t ddr_initialized)
 
     switch (board_init_ddr_get_ramid())
     {
+    case 0x3:
+        #if defined(RAMID3_BD_DDR_RET) & !defined(SKIP_DDR)
+            board_ddr_ret_info = board_init_ddr_ramid_3();
+        #endif
+        break;
     case 0x2:
         #if defined(RAMID2_BD_DDR_RET) & !defined(SKIP_DDR)
             board_ddr_ret_info = board_init_ddr_ramid_2();
@@ -742,12 +806,12 @@ sc_err_t  board_ddr_config(bool rom_caller, board_ddr_action_t action)
             board_ddr_derate_periodic_enable(SC_FALSE);
     #endif
             board_ddr_periodic_enable(SC_FALSE);
-    #if defined RAMID1_BD_DDR_RET || defined RAMID2_BD_DDR_RET
+    #if defined RAMID1_BD_DDR_RET || defined RAMID2_BD_DDR_RET || defined RAMID3_BD_DDR_RET
             soc_ddr_enter_retention();
     #endif
             break;
         case BOARD_DDR_SR_DRC_OFF_EXIT:
-    #if defined RAMID1_BD_DDR_RET || defined RAMID2_BD_DDR_RET
+    #if defined RAMID1_BD_DDR_RET || defined RAMID2_BD_DDR_RET || defined RAMID3_BD_DDR_RET
             soc_ddr_exit_retention();
     #endif
     #ifdef LP4_MANUAL_DERATE_WORKAROUND
@@ -805,6 +869,9 @@ sc_err_t  board_ddr_config(bool rom_caller, board_ddr_action_t action)
         default:
             switch (board_init_ddr_get_ramid())
             {
+            case 0x3:
+                #include "dcd/imx8_ramid3_dcd_1.6GHz.h"
+                break;
             case 0x2:
                 #include "dcd/imx8_ramid2_dcd_1.6GHz.h"
                 break;
