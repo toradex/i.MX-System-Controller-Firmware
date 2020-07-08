@@ -2,7 +2,7 @@
 ** ###################################################################
 **
 **     Copyright (c) 2016 Freescale Semiconductor, Inc.
-**     Copyright 2017-2019 NXP
+**     Copyright 2017-2020 NXP
 **     Copyright 2019-2020 Toradex
 **
 **     Redistribution and use in source and binary forms, with or without modification,
@@ -69,6 +69,7 @@
 #include "drivers/drc/fsl_drc_cbt.h"
 #include "drivers/drc/fsl_drc_derate.h"
 #include "drivers/drc/fsl_drc_rdbi_deskew.h"
+#include "drivers/drc/fsl_drc_dram_vref.h"
 #include "pads.h"
 #include "drivers/pad/fsl_pad.h"
 #include "drivers/systick/fsl_systick.h"
@@ -411,6 +412,9 @@ board_parm_rtn_t board_parameter(board_parm_t parm)
         case BOARD_PARM_DC0_PLL1_SSC:
             rtn = BOARD_PARM_RTN_NOT_USED;
             break;
+        case BOARD_PARM_KS1_WDOG_WAKE:
+            rtn = BOARD_PARM_KS1_WDOG_WAKE_ENABLE;
+            break;
         default :
             ; /* Intentional empty default */
             break;
@@ -424,6 +428,8 @@ board_parm_rtn_t board_parameter(board_parm_t parm)
 /*--------------------------------------------------------------------------*/
 sc_bool_t board_rsrc_avail(sc_rsrc_t rsrc)
 {
+    sc_bool_t rtn = SC_TRUE;
+
     /* Return SC_FALSE here if a resource isn't available due to board
        connections (typically lack of power). Examples incluse DRC_0/1
        and ADC. */
@@ -433,7 +439,7 @@ sc_bool_t board_rsrc_avail(sc_rsrc_t rsrc)
     /* Note return values are usually static. Can be made dynamic by storing
        return in a global variable and setting using board_set_control() */
 
-    return SC_TRUE;
+    return rtn;
 }
 
 /*--------------------------------------------------------------------------*/
@@ -621,8 +627,8 @@ sc_err_t board_init_ddr(sc_bool_t early, sc_bool_t ddr_initialized)
             sc_err_t rate_err = SC_ERR_FAIL;
             if (rm_is_resource_avail(SC_R_DRC_0))
             {
-                rate_err = pm_get_clock_rate(SC_PT, SC_R_DRC_0, SC_PM_CLK_MISC0,
-                    &rate);
+                rate_err = pm_get_clock_rate(SC_PT, SC_R_DRC_0,
+                    SC_PM_CLK_SLV_BUS, &rate);
             }
             if (rate_err == SC_ERR_NONE)
             {
@@ -747,6 +753,15 @@ sc_err_t  board_ddr_config(bool rom_caller, board_ddr_action_t action)
             }
             break;
     #endif
+        case BOARD_DDR0_VREF:
+            #if defined(MONITOR) || defined(EXPORT_MONITOR)
+                // Launch VREF training
+                DRAM_VREF_training_hw(0);
+            #else
+                // Run vref training
+                DRAM_VREF_training_sw(0);
+            #endif
+            break;
         default:
             switch (board_init_ddr_get_ramid())
             {
@@ -793,7 +808,8 @@ void board_system_config(sc_bool_t early, sc_rm_pt_t pt_boot)
 
     /* Configure initial resource allocation (note additional allocation
        and assignments can be made by the SCFW clients at run-time */
-    if (alt_config != SC_FALSE)
+    if ((alt_config != SC_FALSE) 
+        && (rm_is_resource_avail(SC_R_M4_0_PID0) != SC_FALSE))
     {
         sc_rm_pt_t pt_m4_0;
         sc_rm_mr_t mr_m4_0;
@@ -1024,7 +1040,7 @@ sc_err_t board_set_voltage(sc_sub_t ss, uint32_t new_volt, uint32_t old_volt)
 /*--------------------------------------------------------------------------*/
 /* Reset a board resource                                                   */
 /*--------------------------------------------------------------------------*/
-void board_rsrc_reset(sc_rm_idx_t idx, sc_rm_idx_t rsrc_idx)
+void board_rsrc_reset(sc_rm_idx_t idx, sc_rm_idx_t rsrc_idx, sc_rm_pt_t pt)
 {
 }
 

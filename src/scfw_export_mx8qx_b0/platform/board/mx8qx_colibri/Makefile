@@ -53,3 +53,4 @@ DIRS += $(OUT)/board/mx8qx_$(B)
 ifeq ($(M),1)
         OBJS += $(OUT)/board/pmic.o
 endif
+

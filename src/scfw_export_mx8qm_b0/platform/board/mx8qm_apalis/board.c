@@ -2,7 +2,7 @@
 ** ###################################################################
 **
 **     Copyright (c) 2016 Freescale Semiconductor, Inc.
-**     Copyright 2017-2019 NXP
+**     Copyright 2017-2020 NXP
 **     Copyright 2017-2020 Toradex
 **
 **     Redistribution and use in source and binary forms, with or without modification,
@@ -68,6 +68,7 @@
 #include "drivers/drc/fsl_drc_cbt.h"
 #include "drivers/drc/fsl_drc_derate.h"
 #include "drivers/drc/fsl_drc_rdbi_deskew.h"
+#include "drivers/drc/fsl_drc_dram_vref.h"
 #include "drivers/systick/fsl_systick.h"
 #include "pads.h"
 #include "drivers/pad/fsl_pad.h"
@@ -420,6 +421,9 @@ board_parm_rtn_t board_parameter(board_parm_t parm)
         case BOARD_PARM_DC1_PLL1_SSC:
             rtn = BOARD_PARM_RTN_NOT_USED;
             break;
+        case BOARD_PARM_KS1_WDOG_WAKE:
+            rtn = BOARD_PARM_KS1_WDOG_WAKE_ENABLE;
+            break;
         default :
             ; /* Intentional empty default */
             break;
@@ -438,17 +442,22 @@ sc_bool_t board_rsrc_avail(sc_rsrc_t rsrc)
     /* Return SC_FALSE here if a resource isn't available due to board
        connections (typically lack of power). Examples incluse DRC_0/1
        and ADC. */
+
+    /* The value here may be overridden by SoC fuses or emulation config */
+    
+    /* Note return values are usually static. Can be made dynamic by storing
+       return in a global variable and setting using board_set_control() */
+
     #if defined(BD_DDR_RET_NUM_DRC) && (BD_DDR_RET_NUM_DRC == 1U)
         if(rsrc == SC_R_DRC_1)
         {
             rtn = SC_FALSE;
         }
     #endif
-
-    /* The value here may be overridden by SoC fuses or emulation config */
-
-    /* Note return values are usually static. Can be made dynamic by storing
-       return in a global variable and setting using board_set_control() */
+    if(rsrc == SC_R_PMIC_2)
+    {
+        rtn = SC_FALSE;
+    }
 
     return rtn;
 }
@@ -739,13 +748,13 @@ sc_err_t board_init_ddr(sc_bool_t early, sc_bool_t ddr_initialized)
             sc_err_t rate_err = SC_ERR_FAIL;
             if (rm_is_resource_avail(SC_R_DRC_0))
             {
-                rate_err = pm_get_clock_rate(SC_PT, SC_R_DRC_0, SC_PM_CLK_MISC0,
-                    &rate);
+                rate_err = pm_get_clock_rate(SC_PT, SC_R_DRC_0,
+                    SC_PM_CLK_SLV_BUS, &rate);
             }
             else if (rm_is_resource_avail(SC_R_DRC_1))
             {
-                rate_err = pm_get_clock_rate(SC_PT, SC_R_DRC_1, SC_PM_CLK_MISC0,
-                    &rate);
+                rate_err = pm_get_clock_rate(SC_PT, SC_R_DRC_1,
+                    SC_PM_CLK_SLV_BUS, &rate);
             }
             else
             {
@@ -866,6 +875,24 @@ sc_err_t  board_ddr_config(bool rom_caller, board_ddr_action_t action)
             }
             break;
     #endif
+        case BOARD_DDR0_VREF:
+            #if defined(MONITOR) || defined(EXPORT_MONITOR)
+                // Launch VREF training
+                DRAM_VREF_training_hw(0);
+            #else
+                // Run vref training
+                DRAM_VREF_training_sw(0);
+            #endif
+            break;
+        case BOARD_DDR1_VREF:
+            #if defined(MONITOR) || defined(EXPORT_MONITOR)
+                // Launch VREF training
+                DRAM_VREF_training_hw(1);
+            #else
+                // Run vref training
+                DRAM_VREF_training_sw(1);
+            #endif
+            break;
         default:
             switch (board_init_ddr_get_ramid())
             {
@@ -920,7 +947,8 @@ void board_system_config(sc_bool_t early, sc_rm_pt_t pt_boot)
 
     /* Configure initial resource allocation (note additional allocation
        and assignments can be made by the SCFW clients at run-time */
-    if (alt_config != SC_FALSE)
+    if ((alt_config != SC_FALSE) 
+        && (rm_is_resource_avail(SC_R_M4_0_PID0) != SC_FALSE))
     {
         sc_rm_pt_t pt_m4_0;
         sc_rm_pt_t pt_m4_1;
@@ -1236,7 +1264,7 @@ void board_lpm(sc_pm_power_mode_t mode)
 /*--------------------------------------------------------------------------*/
 /* Reset a board resource                                                   */
 /*--------------------------------------------------------------------------*/
-void board_rsrc_reset(sc_rm_idx_t idx, sc_rm_idx_t rsrc_idx)
+void board_rsrc_reset(sc_rm_idx_t idx, sc_rm_idx_t rsrc_idx, sc_rm_pt_t pt)
 {
 }
 

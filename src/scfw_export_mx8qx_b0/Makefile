@@ -1,6 +1,6 @@
 ## ###################################################################
 ##
-##     Copyright 2019 NXP
+##     Copyright 2019-2020 NXP
 ##
 ##     Redistribution and use in source and binary forms, with or without modification,
 ##     are permitted provided that the following conditions are met:
@@ -102,6 +102,11 @@ endif
 ifdef b
     B := $(b)
 endif
+ifdef ALIAS_B
+ifeq ($(B), $(ALIAS_B))
+	override B = $(MAP_B)
+endif
+endif
 ifeq ($(HW), SIMU)
     override B := none
 endif
@@ -144,6 +149,10 @@ ifeq ($(D),1)
 else
 	DEBUG = -Os
 endif
+ifeq ($(COVERAGE),1)
+	DEBUG = -DGCOV -fprofile-arcs -ftest-coverage
+	LDFLAGS = -lgcov --coverage
+endif
 ifdef dl
     DL := $(dl)
 endif
@@ -155,6 +164,17 @@ ifdef tl
 endif
 ifdef TL
 	FLAGS += -DTL=$(TL)
+endif
+
+#configure LTO (link time optimization)
+ifdef lto
+    LTO := $(lto)
+endif
+ifndef lto
+    LTO = 0
+endif
+ifeq ($(LTO),1)
+    CFLAG_LTO = -flto
 endif
 
 # Configure tests
@@ -237,9 +257,11 @@ ifndef EM
 endif
 ifeq ($(M),1)
 	FLAGS += -DMONITOR
+	DCDFLAGS += -DMINIMIZE
 endif
 ifeq ($(EM),1)
 	FLAGS += -DEXPORT_MONITOR
+	DCDFLAGS += -DMINIMIZE
 endif
 
 ifdef NO_OVLY
@@ -257,7 +279,11 @@ WARNS = -Wall -Wextra -Wno-missing-braces -Wno-missing-field-initializers \
     -Wfloat-equal -Wswitch-default -Wcast-align \
     -Wpointer-arith -Wredundant-decls -Wbad-function-cast -Wstrict-prototypes \
     -Wundef -Wcast-qual -Wshadow \
-    -Wold-style-definition -Wno-unused-parameter -Werror -Wstack-usage=1024
+    -Wold-style-definition -Wno-unused-parameter -Werror
+
+ifneq ($(HW), SIMU)
+	WARNS += -Wstack-usage=1024
+endif
 
 # Set common flags
 rootdir := $(CURDIR)
@@ -289,6 +315,7 @@ ifeq ($(HW), SIMU)
     STRIP	= strip
     OBJCOPY	= objcopy
     OBJDUMP	= objdump
+    GCOV    = gcov
 
     INCLUDE = -I$(rootdir)/platform/ \
               -I$(rootdir)/platform/CMSIS/Include/ \
@@ -299,10 +326,19 @@ ifeq ($(HW), SIMU)
               -I$(rootdir)/platform/config/$(CONFIG)/ \
               -I$(rootdir)/platform/config/$(CONFIG)/$(UPPER_C) \
               -I$(rootdir)/platform/board/$(BOARD)
-    CFLAGS = $(FLAGS) -std=gnu99 -m32 -fshort-enums
-    LDFLAGS = -m32 -Wl,-lrt
+
+ifneq ($(COVERAGE),1)
+ifneq ($(NO_ASAN),1)
+	CFLAGS += -fsanitize=address -fno-omit-frame-pointer -fsanitize=undefined
+	LDFLAGS += -lasan -lubsan
+endif
+endif
+
+    CFLAGS += $(FLAGS) -std=gnu99 -m32 -fshort-enums
+    LDFLAGS += -m32 -Wl,-lrt
     FLAGS += -DSIMU -DNO_DEVICE_ACCESS
     WARNS += -Wformat=2 -Wnested-externs
+    TEST_CFLAGS := $(CFLAGS)
 else
     CROSS_COMPILE ?= $(TOOLS)/gcc-arm-none-eabi-*/bin/arm-none-eabi-
     #GNU GCC
@@ -331,8 +367,10 @@ else
               -I$(rootdir)/platform/board/$(BOARD)
     ARCHFLAGS = -mcpu=cortex-m4 -mthumb -mfloat-abi=softfp -mfpu=fpv4-sp-d16 
     CFLAGS = $(INCLUDE) $(ARCHFLAGS) $(FLAGS) -ffunction-sections -std=c99 -mno-unaligned-access -pipe -fno-common -ffunction-sections -fdata-sections -ffreestanding -mapcs -std=c99 -fno-builtin -fshort-enums -DNDEBUG
+    TEST_CFLAGS := $(CFLAGS)
+    CFLAGS += $(CFLAG_LTO)
     AFLAGS = $(INCLUDE) $(ARCHFLAGS) $(FLAGS) -fno-common -ffunction-sections -fdata-sections -mno-unaligned-access -ffreestanding -fno-builtin -std=c99 -pipe
-    LDFLAGS = -Wl,--defsym=__ram_vector_table__=1 -Wl,-Bstatic -Wl,--gc-sections -nostdlib
+    LDFLAGS += -Wl,--defsym=__ram_vector_table__=1 -Wl,-Bstatic -Wl,--gc-sections -nostdlib
 ifeq ($(D),1)
     LIB_C    := $(shell $(CC) $(ARCHFLAGS) --print-file-name=libc_nano.a)
     LIB_GCC  := $(shell $(CC) $(ARCHFLAGS) --print-file-name=libgcc.a)
@@ -419,6 +457,19 @@ ifdef NO_OVLY
 	TCM_LD = $(SRC)/devices/$(DEVICE)/linker/gcc/$(DEVICE)_tcm.ld
 endif
 
+FUSE_DIRNAME=../test_files
+ifneq "$(wildcard $(FUSE_DIRNAME) )" ""
+	FIRST_R := $(shell echo $(UPPER_R) | cut -c1-1)
+	FUSEFILES += $(shell find ../test_files/$(CONFIG)/fuses -name "*$(FIRST_R).txt")
+	FUSELOGS += $(FUSEFILES:../test_files/$(CONFIG)/%=$(OUT)/%)
+endif
+
+CONFIG_DIRNAME=../test_files
+ifneq "$(wildcard $(CONFIG_DIRNAME) )" ""
+	CONFIGFILES += $(shell find ../test_files/$(CONFIG)/configs -name "*.txt")
+	CONFIGLOGS += $(CONFIGFILES:../test_files/$(CONFIG)/%=$(OUT)/%)
+endif
+
 # Build rules
 
 all : help
@@ -430,6 +481,7 @@ endif
 CONFIGH+=$(SRC)/config/$(CONFIG)/pads.h
 CONFIGH+=$(SRC)/config/$(CONFIG)/pad_data.h
 CONFIGH+=$(SRC)/config/$(CONFIG)/pad_priority.h
+TPROTOH+=$(SRC)/test/$(CONFIG)/test_all.c $(SRC)/test/common/test.h $(SRC)/devices/$(DEVICE)/linker/gcc/$(DEVICE)_overlay.ld
 PAD_MD += $(SRC)/config/pad.txt
 MEMMAP_MD += $(SRC)/devices/$(DEVICE)/memmap.txt
 
@@ -440,11 +492,13 @@ INCH+= $(SRC)/config/$(CONFIG)/all_api.h $(SRC)/config/$(CONFIG)/all_svc.h \
 
 MD+=doc/resources.md doc/clocks.md doc/controls.md doc/pads.md
 
-.SECONDARY : ${INCH} ${INFH} ${CONFIGH} ${RPCH} ${RPCC} ${RSRC_MD} ${CLK_MD} $(CTRL_MD) $(MEMMAP_MD)
+.SECONDARY : ${INCH} ${INFH} ${CONFIGH} ${RPCH} ${RPCC} ${RPCHDR} ${RSRC_MD} ${CLK_MD} $(CTRL_MD) $(MEMMAP_MD) $(TPROTOH)
 
-.INTERMEDIATE : ${MD}
+.INTERMEDIATE : ${MD} $(SRC)/test/board_system_config.c
 
 .PRECIOUS : ${DCDH}
+
+GCOV_OUT := $(OBJS:.o=.gcov)
 
 # Include config makefiles
 MAKERULE := $(shell find makefiles -name Makefile.rules)
@@ -457,14 +511,14 @@ $(OUT)/sc : ${OBJS}
 
 .SUFFIXES :
 
-$(OUT)/board/%.o : $(SRC)/board/%.c ${INCH} ${INFH} ${CONFIGH} ${BIH} ${DCDH}
+$(OUT)/board/%.o : $(SRC)/board/%.c ${INCH} ${INFH} ${CONFIGH} ${BIH} ${DCDH} $(SRC)/test/common/test.h
 	@echo "Compiling $<"
 	$(AT)${CC} ${CFLAGS} ${INCLUDE} -c $< -o $@
 
 $(SRC)/board/$(CONFIG)_$(B)/dcd/%.h : $(SRC)/board/$(CONFIG)_$(B)/dcd/%.cfg
 	@echo "Generating $@"
 	$(AT)rm -f $(*F).temp
-	$(AT)${CPP} -P -I$(SRC)/devices $< $(*F).temp
+	$(AT)${CPP} -P -I$(SRC)/devices $(DCDFLAGS) $< $(*F).temp
 	$(AT)sed -i -f bin/dcd.sed $(*F).temp
 #	$(AT)echo "#ifndef $(subst .,_,$(*F))_H" > $@
 #	$(AT)echo "#define $(subst .,_,$(*F))_H" >> $@
@@ -483,7 +537,7 @@ $(SRC)/board/$(CONFIG)_$(B)/dcd/dcd.h : $(SRC)/board/$(CONFIG)_$(B)/dcd/$(DDR_CO
 $(SRC)/board/$(CONFIG)_$(B)/dcd/%_retention.h : $(SRC)/board/$(CONFIG)_$(B)/dcd/%.cfg
 	@echo "Generating $@"
 	$(AT)rm -f $(*F)_ret.temp
-	$(AT)${CPP} -P -I$(SRC)/devices $< $(*F)_ret.temp
+	$(AT)${CPP} -P -I$(SRC)/devices $(DCDFLAGS) $< $(*F)_ret.temp
 	$(AT)sed -i -f bin/retention.sed $(*F)_ret.temp
 	$(AT)echo "#ifndef $(subst .,_,$(*F))_RET_H" > $@
 	$(AT)echo "#define $(subst .,_,$(*F))_RET_H" >> $@
@@ -502,6 +556,20 @@ $(SRC)/board/$(CONFIG)_$(B)/dcd/dcd_retention.h : $(SRC)/board/$(CONFIG)_$(B)/dc
 $(OUT)/drivers/pmic/%.o : $(SRC)/drivers/pmic/%.c ${INCH} ${INFH} ${CONFIGH} ${BIH} ${DCDH}
 	@echo "Compiling $<"
 	$(AT)${CC} ${CFLAGS} ${INCLUDE} -c $< -o $@
+
+$(OUT)/fuses/%.txt : $(OUT)/ $(OUT)/sc
+	$(AT)mkdir -p $(OUT)/fuses
+	$(OUT)/sc -r 0 -f ../test_files/$(CONFIG)/fuses/$*.txt 2> $(OUT)/fuses/$*.txt
+	$(OUT)/sc -r 1 -f ../test_files/$(CONFIG)/fuses/$*.txt 2> $(OUT)/fuses/$*.txt
+
+$(OUT)/configs/%.txt : $(OUT)/ $(OUT)/sc
+	$(AT)mkdir -p $(OUT)/configs
+	$(OUT)/sc -r 0 -c ../test_files/$(CONFIG)/configs/$*.txt 2> $(OUT)/configs/$*.txt
+	$(OUT)/sc -r 1 -c ../test_files/$(CONFIG)/configs/$*.txt 2> $(OUT)/configs/$*.txt
+
+$(OUT)/%.gcov : $(FUSELOGS) $(CONFIGLOGS)
+	@echo "Coverage $@"
+	$(AT)${GCOV} -p platform/$*.c -o $(OUT)/$*
 
 
 $(OUT)/%.o : $(SRC)/%.S
@@ -546,9 +614,9 @@ $(OUT)/scfw_tests.srec : $(OUT)/scfw_tcm.elf
 	@echo "Objcopy $@ ...."
 	$(AT)$(OBJCOPY) -O srec --gap-fill 0x0 -j .test* --pad-to 0x30000 $(OUT)/scfw_tcm.elf $(OUT)/scfw_tests.srec --strip-debug
 
-$(OUT)/scfw.elf : $(OBJS) $(SRC)/devices/$(DEVICE)/linker/gcc/$(DEVICE)_flash.ld
+$(OUT)/scfw.elf : $(OUT)/devices/$(DEVICE)/gcc/startup_$(DEVICE).o $(SRC)/devices/$(DEVICE)/linker/gcc/$(DEVICE)_flash.ld
 	@echo "Linking $@ ...."
-	$(AT)$(CC) $(ARCHFLAGS) $(LDFLAGS) -o $@ -T $(SRC)/devices/$(DEVICE)/linker/gcc/$(DEVICE)_flash.ld $(OBJS) $(LCNANO) -lgcc -Wl,-Map=$(OUT)/scfw.map
+	$(AT)$(CC) $(ARCHFLAGS) $(LDFLAGS) -o $@ -T $(SRC)/devices/$(DEVICE)/linker/gcc/$(DEVICE)_flash.ld $(OUT)/devices/$(DEVICE)/gcc/startup_$(DEVICE).o -lgcc -Wl,-Map=$(OUT)/scfw.map
 
 $(OUT)/scfw_tcm.elf : $(OBJS) $(TCM_LD)
 	@echo "Linking $@ ...."
@@ -578,6 +646,8 @@ help :
 	@/bin/echo -e "\tR=<srev>       : silicon revision (default=A0)"
 	@/bin/echo -e "\tM=0            : no debug monitor (default)"
 	@/bin/echo -e "\tM=1            : include debug monitor"
+	@/bin/echo -e "\tLTO=0          : build without link-time optimization (default)"
+	@/bin/echo -e "\tLTO=1          : build with link-time optimization"
 	@/bin/echo -e "\tT=<test>       : run tests rather than boot next core"
 	@/bin/echo -en $(HELP_OPT)
 

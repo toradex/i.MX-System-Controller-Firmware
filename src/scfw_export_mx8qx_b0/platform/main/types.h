@@ -2,7 +2,7 @@
 ** ###################################################################
 **
 **     Copyright (c) 2016 Freescale Semiconductor, Inc.
-**     Copyright 2017-2019 NXP
+**     Copyright 2017-2020 NXP
 **
 **     Redistribution and use in source and binary forms, with or without modification,
 **     are permitted provided that the following conditions are met:
@@ -51,10 +51,19 @@
 /* Defines */
 
 /*!
+ * @name Defines for chip IDs
+ */
+#define CHIP_ID_QM      0x1U   /*!< i.MX8QM */
+#define CHIP_ID_QX      0x2U   /*!< i.MX8QX*/
+#define CHIP_ID_DXL     0xEU   /*!< i.MX8DXL */
+/*@}*/
+
+/*!
  * @name Defines for common frequencies
  */
 /*@{*/
 #define SC_32KHZ            32768U   /*!< 32KHz */
+#define SC_1MHZ           1000000U   /*!< 1MHz  */
 #define SC_10MHZ         10000000U   /*!< 10MHz */
 #define SC_16MHZ         16000000U   /*!< 16MHz */
 #define SC_20MHZ         20000000U   /*!< 20MHz */
@@ -72,6 +81,7 @@
 #define SC_100MHZ       100000000U   /*!< 100MHz */
 #define SC_114MHZ       114000000U   /*!< 114MHz */
 #define SC_125MHZ       125000000U   /*!< 125MHz */
+#define SC_128MHZ       128000000U   /*!< 128MHz */
 #define SC_133MHZ       133333333U   /*!< 133MHz */
 #define SC_135MHZ       135000000U   /*!< 135MHz */
 #define SC_150MHZ       150000000U   /*!< 150MHz */
@@ -184,7 +194,7 @@
 #define SC_BOOL_W       1U           /*!< Width of sc_bool_t */
 #define SC_ERR_W        4U           /*!< Width of sc_err_t */
 #define SC_RSRC_W       10U          /*!< Width of sc_rsrc_t */
-#define SC_CTRL_W       6U           /*!< Width of sc_ctrl_t */
+#define SC_CTRL_W       7U           /*!< Width of sc_ctrl_t */
 /*@}*/
 
 /*!
@@ -196,7 +206,7 @@
 /*@}*/
 
 /*!
- * @name Defines for sc_err_t.
+ * @name Defines for sc_err_t
  */
 /*@{*/
 #define SC_ERR_NONE         0U      /*!< Success */
@@ -215,7 +225,7 @@
 /*@}*/
 
 /*!
- * @name Defines for sc_rsrc_t.
+ * @name Defines for sc_rsrc_t
  */
 /*@{*/
 #define SC_R_A53                  0U
@@ -261,7 +271,7 @@
 #define SC_R_V2X_MU_3             40U
 #define SC_R_V2X_MU_4             41U
 #define SC_R_DC_1_WARP            42U
-#define SC_R_TBU_CTL              43U
+#define SC_R_UNUSED1              43U
 #define SC_R_SECVIO               44U
 #define SC_R_DC_1_VIDEO0          45U
 #define SC_R_DC_1_VIDEO1          46U
@@ -777,7 +787,7 @@
 /* NOTE - please add by replacing some of the UNUSED from above! */
 
 /*!
- * Defines for sc_ctrl_t.
+ * Defines for sc_ctrl_t
  */
 #define SC_C_TEMP                       0U
 #define SC_C_TEMP_HI                    1U
@@ -837,16 +847,27 @@
 #define SC_C_SYNC_CTRL                  55U
 #define SC_C_OFS_AUDIO_ALT              56U
 #define SC_C_DSP_BYP                    57U
-#define SC_C_PMIC_I2C                   58U
-#define SC_C_PMIC_I2C_READ_REG          59U
-#define SC_C_LAST                       60U
+#define SC_C_CLK_GEN_EN	                58U
+#define SC_C_INTF_SEL                   59U
+#define SC_C_RXC_DLY                    60U
+#define SC_C_TIMER_SEL                  61U           
+#define SC_C_MISC0                      62U           
+#define SC_C_MISC1                      63U           
+#define SC_C_MISC2                      64U           
+#define SC_C_MISC3                      65U           
+#define SC_C_PMIC_I2C                   66U
+#define SC_C_PMIC_I2C_READ_REG          67U
+#define SC_C_LAST                       68U
 
+/*!
+ * Define for used to specify all pads
+ */
 #define SC_P_ALL        ((sc_pad_t) UINT16_MAX)   /*!< All pads */
 
 /* Types */
 
 /*!
- * This type is used to store a boolean
+ * This type is used to store a boolean.
  */
 typedef uint8_t sc_bool_t;
 
@@ -879,9 +900,9 @@ typedef uint32_t sc_ctrl_t;
  */
 typedef uint16_t sc_pad_t;
 
-/* Extra documentation of standard types */
-
 #ifdef DOXYGEN
+    /* Extra documentation of standard types */
+
     /*!
      * Type used to declare an 8-bit integer.
      */
