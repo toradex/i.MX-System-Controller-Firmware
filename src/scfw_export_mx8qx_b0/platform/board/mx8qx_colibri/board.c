@@ -1323,7 +1323,6 @@ sc_bool_t board_get_button_status(void)
 /*--------------------------------------------------------------------------*/
 /* Set control value                                                        */
 /*--------------------------------------------------------------------------*/
-static uint8_t read_reg = 0;
 
 sc_err_t board_set_control(sc_rsrc_t resource, sc_rm_idx_t idx,
     sc_rm_idx_t rsrc_idx, uint32_t ctrl, uint32_t val)
@@ -1353,24 +1352,6 @@ sc_err_t board_set_control(sc_rsrc_t resource, sc_rm_idx_t idx,
                 else
                 {
                     err = SC_ERR_PARM;
-                }
-                break;
-            case SC_R_BOARD_R0 :
-                switch (ctrl)
-                {
-                    case SC_C_PMIC_I2C:
-                    {
-                        uint8_t reg_val = val & 0xffu;
-                        uint8_t reg = (val & 0xff00u) >> 8;
-                        board_print(2,"PMIC write reg 0x%x to 0x%x\n", reg, reg_val);
-                        err = PMIC_REGISTER_ACCESS(PMIC_0_ADDR, reg, true, &reg_val);
-                        break;
-                    }
-                    case SC_C_PMIC_I2C_READ_REG:
-                        read_reg = val &0xffu;
-                        break;
-                    default:
-                        return SC_ERR_PARM;
                 }
                 break;
             default :
@@ -1422,21 +1403,6 @@ sc_err_t board_get_control(sc_rsrc_t resource, sc_rm_idx_t idx,
                 else
                 {
                     err = SC_ERR_PARM;
-                }
-                break;
-            case SC_R_BOARD_R0 :
-                switch (ctrl)
-                {
-                    case SC_C_PMIC_I2C:
-                    {
-                        uint8_t reg_val;
-                        err  = PMIC_REGISTER_ACCESS(PMIC_0_ADDR, read_reg, false, &reg_val);
-                        *val = reg_val;
-                        board_print(2, "PMIC reg %x read as %x, returning %x\n", read_reg, reg_val, *val);
-                        break;
-                    }
-                    default:
-                        err = SC_ERR_PARM;
                 }
                 break;
             default :
