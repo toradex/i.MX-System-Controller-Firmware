@@ -99,12 +99,12 @@
 #define BRD_R_BOARD_PMIC_2      2U
 #define BRD_R_BOARD_R0          3U
 #define BRD_R_BOARD_R1          4U
-#define BRD_R_BOARD_R2          5U       /* HSIC */
+#define BRD_R_BOARD_R2          5U
 #define BRD_R_BOARD_R3          6U
 #define BRD_R_BOARD_R4          7U
 #define BRD_R_BOARD_R5          8U
 #define BRD_R_BOARD_R6          9U
-#define BRD_R_BOARD_R7          10U      /*!< Test */
+#define BRD_R_BOARD_R7          10U
 /*@}*/
 
 #if DEBUG_UART == 3
@@ -1337,6 +1337,20 @@ void board_trans_resource_power(sc_rm_idx_t idx, sc_rm_idx_t rsrc_idx,
                 {
                     BRD_ERR(PMIC_SET_VOLTAGE(PMIC_1_ADDR, PF8100_LDO1,
                         1800, REG_RUN_MODE));
+                    BRD_ERR(PMIC_SET_MODE(PMIC_1_ADDR, PF8100_LDO1,
+                        RUN_EN_STBY_EN));
+                }
+                else
+                {
+                    BRD_ERR(PMIC_SET_MODE(PMIC_1_ADDR, PF8100_LDO1,
+                        RUN_OFF_STBY_OFF));
+                }
+                break;
+            case BRD_R_BOARD_R3 : /* Apalis external RGMII interface in 2.5V */
+                if (to_mode > SC_PM_PW_MODE_OFF)
+                {
+                    BRD_ERR(PMIC_SET_VOLTAGE(PMIC_1_ADDR, PF8100_LDO1,
+                        2500, REG_RUN_MODE));
                     BRD_ERR(PMIC_SET_MODE(PMIC_1_ADDR, PF8100_LDO1,
                         RUN_EN_STBY_EN));
                 }
