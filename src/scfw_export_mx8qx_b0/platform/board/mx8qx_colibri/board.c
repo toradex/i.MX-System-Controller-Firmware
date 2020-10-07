@@ -113,15 +113,22 @@
     /*! Use alternate debug UART */
     #define ALT_DEBUG_SCU_UART
 #endif
+#if DEBUG_UART == 6
+    /*! Use standard debug UART */
+    #define DEBUG_STD_UART
+#endif
+
 #if (defined(MONITOR) || defined(EXPORT_MONITOR) || defined(HAS_TEST) \
         || (DEBUG_UART == 1)) && !defined(DEBUG_TERM_EMUL) \
-        && !defined(ALT_DEBUG_SCU_UART)
+        && !defined(ALT_DEBUG_SCU_UART) && !defined(DEBUG_STD_UART)
     #define ALT_DEBUG_UART
 #endif
 
 /*! Configure debug UART */
 #ifdef ALT_DEBUG_SCU_UART
     #define LPUART_DEBUG        LPUART_SC
+#elif defined(DEBUG_STD_UART)
+    #define LPUART_DEBUG        LPUART6
 #else
     #define LPUART_DEBUG        LPUART_M4_0
 #endif
@@ -129,6 +136,8 @@
 /*! Configure debug UART instance */
 #ifdef ALT_DEBUG_SCU_UART
     #define LPUART_DEBUG_INST   0U
+#elif defined(DEBUG_STD_UART)
+    #define LPUART_DEBUG_INST   5U
 #else
     #define LPUART_DEBUG_INST   2U
 #endif
@@ -222,6 +231,18 @@ void board_init(boot_phase_t phase)
 {
     ss_print(3, "board_init(%d)\n", phase);
 
+    // when HW is initialized finish configuring LPUART3 and attach debug_uart
+    if (phase == BOOT_PHASE_HW_INIT && DEBUG_UART == 6)
+    {
+        volatile uint64_t * a = (uint64_t *) 0x5a090018;
+        volatile uint64_t * b = (uint64_t *) 0x5a090010;
+        volatile uint64_t * c = (uint64_t *) 0x5a090028;
+        *a = 0x000c0000;
+        *b = 0x19000008;
+        *c = 0x00c000dd;
+        main_config_debug_uart(LPUART_DEBUG, SC_24MHZ);
+    }
+
     if (phase == BOOT_PHASE_FINAL_INIT)
     {
         /* Configure SNVS button for rising edge */
@@ -237,7 +258,7 @@ void board_init(boot_phase_t phase)
 /*--------------------------------------------------------------------------*/
 LPUART_Type *board_get_debug_uart(uint8_t *inst, uint32_t *baud)
 {
-    #if (defined(ALT_DEBUG_UART) || defined(ALT_DEBUG_SCU_UART)) \
+    #if (defined(ALT_DEBUG_UART) || defined(ALT_DEBUG_SCU_UART) || defined(DEBUG_STD_UART)) \
             && !defined(DEBUG_TERM_EMUL)
         *inst = LPUART_DEBUG_INST;
         *baud = DEBUG_BAUD;
@@ -254,7 +275,7 @@ LPUART_Type *board_get_debug_uart(uint8_t *inst, uint32_t *baud)
 void board_config_debug_uart(sc_bool_t early_phase)
 {
     #if (defined(ALT_DEBUG_UART) || defined(ALT_DEBUG_SCU_UART) || \
-            defined(DEBUG_TERM_EMUL)) && defined(DEBUG) && !defined(SIMU)
+            defined(DEBUG_TERM_EMUL)) || defined(DEBUG_STD_UART) && defined(DEBUG) && !defined(SIMU)
         static sc_bool_t banner = SC_FALSE;
     #endif
 
@@ -269,6 +290,7 @@ void board_config_debug_uart(sc_bool_t early_phase)
         {
             main_config_debug_uart(LPUART_DEBUG, SC_24MHZ);
         }
+
     #elif defined(ALT_DEBUG_UART) && defined(DEBUG) && !defined(SIMU)
         /* Use M4 UART if ALT_DEBUG_UART defined */
         /* Return if debug already enabled */
@@ -298,6 +320,64 @@ void board_config_debug_uart(sc_bool_t early_phase)
             /* Configure UART */
             main_config_debug_uart(LPUART_DEBUG, rate);
         }
+    #elif defined(DEBUG_STD_UART) && defined(DEBUG) && !defined(SIMU)
+        sc_pm_clock_rate_t rate = SC_80MHZ;
+        sc_ipc_t ipc_uart = 0;
+        sc_err_t sciErr = 0;
+
+        // initializing clocks as done in U-Boot
+        sciErr = pm_set_clock_rate(SC_PT, SC_R_UART_0, SC_PM_CLK_PER, &rate);
+        if (sciErr != SC_ERR_NONE)
+            debug_print(1, "\nSet clock rate of UART0 failed.");
+
+        pm_force_resource_power_mode_v(SC_R_UART_3, SC_PM_PW_MODE_ON);
+        sciErr = sc_pm_set_clock_rate(ipc_uart, SC_R_UART_3, SC_PM_CLK_PER, &rate);
+        if (sciErr != SC_ERR_NONE)
+            debug_print(1, "\nSet clock rate of UART3 failed.");
+        pm_force_clock_enable(SC_R_UART_3, SC_PM_CLK_PER,
+            SC_TRUE);
+
+        // Configure pads
+        pad_force_mux(SC_P_FLEXCAN2_RX, 2, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
+        pad_force_mux(SC_P_FLEXCAN2_TX, 2, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
+        pad_force_mux(SC_P_QSPI0B_DQS, 4, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
+
+        // list based on resources powered on in u-boot
+        pm_force_resource_power_mode_v(SC_R_DB, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_SC_PID0, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_SC_TPM, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_SC_UART, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_SC_I2C, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_SC_MU_0B, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_SC_MU_1A, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_A35, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_A35_0, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_SDHC_0, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_SDHC_1, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_USB_0, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_USB_0_PHY, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_USB_1, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_USB_1_PHY, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_USB_2, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_USB_2_PHY, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_DRC_0, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_GPIO_0, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_GPT_0, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_MU_0A, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_MU_1A, SC_PM_PW_MODE_ON);
+        pad_force_mux(SC_P_MIPI_DSI1_GPIO0_01, 2, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
+        pm_force_resource_power_mode_v(SC_P_MIPI_DSI1_GPIO0_01, SC_PM_PW_MODE_ON);
+        pad_force_mux(SC_P_SAI1_RXD, 4, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
+        pm_force_resource_power_mode_v(SC_P_SAI1_RXD, SC_PM_PW_MODE_ON);
+        pad_force_mux(SC_P_SAI1_RXC, 3, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
+        pm_force_resource_power_mode_v(SC_P_SAI1_RXC, SC_PM_PW_MODE_ON);
+        pad_force_mux(SC_P_CSI_RESET, 4, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
+        pm_force_resource_power_mode_v(SC_P_CSI_RESET, SC_PM_PW_MODE_ON);
+        pad_force_mux(SC_P_USDHC1_CD_B, 4, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
+        pm_force_resource_power_mode_v(SC_P_USDHC1_CD_B, SC_PM_PW_MODE_ON);
+        pad_force_mux(SC_P_CSI_EN, 4, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
+        pm_force_resource_power_mode_v(SC_P_CSI_EN, SC_PM_PW_MODE_ON);
+
     #elif defined(DEBUG_TERM_EMUL) && defined(DEBUG) && !defined(SIMU)
         *SCFW_DBG_TX_PTR = 0U;
         *SCFW_DBG_RX_PTR = 0U;
@@ -306,7 +386,7 @@ void board_config_debug_uart(sc_bool_t early_phase)
     #endif
 
     #if (defined(ALT_DEBUG_UART) || defined(ALT_DEBUG_SCU_UART) || \
-            defined(DEBUG_TERM_EMUL)) && defined(DEBUG) && !defined(SIMU)
+            defined(DEBUG_TERM_EMUL)) || defined(DEBUG_STD_UART) && defined(DEBUG) && !defined(SIMU)
         if (banner == SC_FALSE)
         {
             debug_print(1, 
@@ -368,6 +448,14 @@ void board_config_sc(sc_rm_pt_t pt_sc)
         (void) rm_set_pad_movable(pt_sc, SC_P_SCU_GPIO0_00,
             SC_P_SCU_GPIO0_01, SC_FALSE);
     #endif
+
+    #ifdef DEBUG_STD_UART
+        sc_rm_pt_t pt_uart3;
+        rm_get_pad_owner(SC_P_FLEXCAN2_RX, &pt_uart3);
+        (void) rm_set_resource_movable(pt_uart3, SC_R_UART_3, SC_R_UART_3, SC_FALSE);
+        (void) rm_set_pad_movable(pt_uart3, SC_P_FLEXCAN2_RX, SC_P_FLEXCAN2_TX, SC_FALSE);
+    #endif
+
     /* SCU.DSC.RTC_CLOCK_OUTPUT_32K aka 32 kHz standby clock for Wi-Fi */
     (void) rm_set_pad_movable(pt_sc, SC_P_SCU_BOOT_MODE3, SC_P_SCU_BOOT_MODE3,
         SC_TRUE);
