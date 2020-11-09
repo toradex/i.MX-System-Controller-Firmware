@@ -50,3 +50,7 @@ CTRL_MD += $(SRC)/board/mx8qm_$(B)/control.txt
 
 DIRS += $(OUT)/board/mx8qm_$(B)
 
+ifeq ($(M),1)
+        OBJS += $(OUT)/board/pmic.o
+endif
+
