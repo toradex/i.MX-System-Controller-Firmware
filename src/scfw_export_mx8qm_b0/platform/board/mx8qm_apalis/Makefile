@@ -30,25 +30,25 @@
 ##
 ## ###################################################################
 
-OBJS += $(OUT)/board/mx8qm_$(B)/board.o \
+OBJS += $(OUT)/board/$(CONFIG)_$(B)/board.o \
 		$(OUT)/board/board_common.o
 
 ifneq ($(HW), SIMU)
     OBJS += $(OUT)/board/board.o
 endif
 
-DCDH += $(SRC)/board/mx8qm_$(B)/dcd/imx8_ramid1_dcd_1.6GHz.h \
-	$(SRC)/board/mx8qm_$(B)/dcd/imx8_ramid2_dcd_1.6GHz.h \
-	$(SRC)/board/mx8qm_$(B)/dcd/imx8_ramid3_dcd_1.6GHz.h \
-	$(SRC)/board/mx8qm_$(B)/dcd/imx8_ramid1_dcd_1.6GHz_retention.h \
-	$(SRC)/board/mx8qm_$(B)/dcd/imx8_ramid2_dcd_1.6GHz_retention.h \
-	$(SRC)/board/mx8qm_$(B)/dcd/imx8_ramid3_dcd_1.6GHz_retention.h
+DCDH += $(SRC)/board/$(CONFIG)_$(B)/dcd/imx8_ramid1_dcd_1.6GHz.h \
+	$(SRC)/board/$(CONFIG)_$(B)/dcd/imx8_ramid2_dcd_1.6GHz.h \
+	$(SRC)/board/$(CONFIG)_$(B)/dcd/imx8_ramid3_dcd_1.6GHz.h \
+	$(SRC)/board/$(CONFIG)_$(B)/dcd/imx8_ramid1_dcd_1.6GHz_retention.h \
+	$(SRC)/board/$(CONFIG)_$(B)/dcd/imx8_ramid2_dcd_1.6GHz_retention.h \
+	$(SRC)/board/$(CONFIG)_$(B)/dcd/imx8_ramid3_dcd_1.6GHz_retention.h
 
-RSRC_MD += $(SRC)/board/mx8qm_$(B)/resource.txt
+RSRC_MD += $(SRC)/board/$(CONFIG)_$(B)/resource.txt
 
-CTRL_MD += $(SRC)/board/mx8qm_$(B)/control.txt
+CTRL_MD += $(SRC)/board/$(CONFIG)_$(B)/control.txt
 
-DIRS += $(OUT)/board/mx8qm_$(B)
+DIRS += $(OUT)/board/$(CONFIG)_$(B)
 
 ifeq ($(M),1)
         OBJS += $(OUT)/board/pmic.o

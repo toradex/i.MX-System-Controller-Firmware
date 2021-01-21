@@ -3,7 +3,7 @@
 **
 **     Copyright (c) 2016 Freescale Semiconductor, Inc.
 **     Copyright 2017-2020 NXP
-**     Copyright 2018-2020 Toradex
+**     Copyright 2018-2021 Toradex
 **
 **     Redistribution and use in source and binary forms, with or without modification,
 **     are permitted provided that the following conditions are met:
@@ -62,9 +62,10 @@
 #include "drivers/pmic/fsl_pmic.h"
 #include "drivers/pmic/pf8100/fsl_pf8100.h"
 #include "drivers/rgpio/fsl_rgpio.h"
+#include "drivers/igpio/fsl_gpio.h"
 #include "drivers/snvs/fsl_snvs.h"
-#include "drivers/wdog32/fsl_wdog32.h"
 #include "drivers/lpuart/fsl_lpuart.h"
+#include "drivers/sysctr/fsl_sysctr.h"
 #include "drivers/drc/fsl_drc_cbt.h"
 #include "drivers/drc/fsl_drc_derate.h"
 #include "drivers/drc/fsl_drc_rdbi_deskew.h"
@@ -84,16 +85,16 @@
  * @name Board Configuration
  * DO NOT CHANGE - must match object code.
  */
-/*@{*/
+/** @{ */
 #define BRD_NUM_RSRC            11U
 #define BRD_NUM_CTRL            6U
-/*@}*/
+/** @} */
 
 /*!
  * @name Board Resources
  * DO NOT CHANGE - must match object code.
  */
-/*@{*/
+/** @{ */
 #define BRD_R_BOARD_PMIC_0      0U
 #define BRD_R_BOARD_R0          3U
 #define BRD_R_BOARD_R1          4U
@@ -103,7 +104,7 @@
 #define BRD_R_BOARD_R5          8U
 #define BRD_R_BOARD_R6          9U
 #define BRD_R_BOARD_R7          10U      /*!< Test */
-/*@}*/
+/** @} */
 
 #if DEBUG_UART == 3
     /*! Use debugger terminal emulation */
@@ -130,7 +131,7 @@
 #elif defined(DEBUG_STD_UART)
     #define LPUART_DEBUG        LPUART6
 #else
-    #define LPUART_DEBUG        LPUART_M4_0
+    #define LPUART_DEBUG        LPUART_MCU_0
 #endif
 
 /*! Configure debug UART instance */
@@ -139,7 +140,7 @@
 #elif defined(DEBUG_STD_UART)
     #define LPUART_DEBUG_INST   5U
 #else
-    #define LPUART_DEBUG_INST   2U
+    #define LPUART_DEBUG_INST   1U
 #endif
 
 #ifdef EMUL
@@ -478,6 +479,7 @@ board_parm_rtn_t board_parameter(board_parm_t parm)
         case BOARD_PARM_PCIE_PLL :
             rtn = BOARD_PARM_RTN_EXTERNAL;
             break;
+        /* Supply ramp delay in usec for KS1 exit */
         case BOARD_PARM_KS1_RESUME_USEC:
             if (OTP_KS1_07V_SUPPORT == 1U) /* KS1 0.7V support */
             {
@@ -488,18 +490,23 @@ board_parm_rtn_t board_parameter(board_parm_t parm)
                 rtn = BOARD_KS1_RESUME_USEC;
             }
             break;
+        /* Control if retention is applied during KS1 */
         case BOARD_PARM_KS1_RETENTION:
             rtn = BOARD_KS1_RETENTION;
             break;
+        /* Control if ONOFF button can wake from KS1 */
         case BOARD_PARM_KS1_ONOFF_WAKE:
             rtn = BOARD_KS1_ONOFF_WAKE;
             break;
+        /* DC0 PLL0 spread spectrum config */
         case BOARD_PARM_DC0_PLL0_SSC:
             rtn = BOARD_PARM_RTN_NOT_USED;
             break;
+        /* DC0 PLL1 spread spectrum config */
         case BOARD_PARM_DC0_PLL1_SSC:
             rtn = BOARD_PARM_RTN_NOT_USED;
             break;
+        /* Control if SC WDOG configuration during KS1 */
         case BOARD_PARM_KS1_WDOG_WAKE:
             rtn = BOARD_PARM_KS1_WDOG_WAKE_ENABLE;
             break;
@@ -527,7 +534,23 @@ sc_bool_t board_rsrc_avail(sc_rsrc_t rsrc)
     /* Note return values are usually static. Can be made dynamic by storing
        return in a global variable and setting using board_set_control() */
 
+    if(rsrc == SC_R_PMIC_1)
+    {
+        rtn = SC_FALSE;
+    }
+    if(rsrc == SC_R_PMIC_2)
+    {
+        rtn = SC_FALSE;
+    }
+
     return rtn;
+}
+
+/*--------------------------------------------------------------------------*/
+/* Override QoS configuration                                               */
+/*--------------------------------------------------------------------------*/
+void board_qos_config(sc_sub_t ss)
+{
 }
 
 /*--------------------------------------------------------------------------*/
@@ -724,7 +747,7 @@ sc_err_t board_init_ddr(sc_bool_t early, sc_bool_t ddr_initialized)
             break;
         default:
             /* legacy RAM handling */
-            if (OTP_A35_DIS != 0x0) { /* DX has two A35 cores disabled */
+            if (OTP_AP_2_DIS != 0x0) { /* DX has two A35 cores disabled */
                 #if defined(RAMID2_BD_DDR_RET) & !defined(SKIP_DDR)
                     board_ddr_ret_info = board_init_ddr_ramid_2();
                 #endif
@@ -763,16 +786,20 @@ sc_err_t board_init_ddr(sc_bool_t early, sc_bool_t ddr_initialized)
         }
 
         #ifdef DEBUG_BOARD
-            uint32_t rate = 0U;
-            sc_err_t rate_err = SC_ERR_FAIL;
-            if (rm_is_resource_avail(SC_R_DRC_0))
+            if (err == SC_ERR_NONE)
             {
-                rate_err = pm_get_clock_rate(SC_PT, SC_R_DRC_0,
-                    SC_PM_CLK_SLV_BUS, &rate);
-            }
-            if (rate_err == SC_ERR_NONE)
-            {
-                board_print(1, "DDR frequency = %u\n", rate * 2U);
+                uint32_t rate = 0U;
+                sc_err_t rate_err = SC_ERR_FAIL;
+
+                if (rm_is_resource_avail(SC_R_DRC_0))
+                {
+                    rate_err = pm_get_clock_rate(SC_PT, SC_R_DRC_0,
+                        SC_PM_CLK_SLV_BUS, &rate);
+                }
+                if (rate_err == SC_ERR_NONE)
+                {
+                    board_print(1, "DDR frequency = %u\n", rate * 2U);
+                }
             }
         #endif
 
@@ -802,7 +829,7 @@ sc_err_t board_init_ddr(sc_bool_t early, sc_bool_t ddr_initialized)
 /*--------------------------------------------------------------------------*/
 /* Take action on DDR                                                       */
 /*--------------------------------------------------------------------------*/
-sc_err_t  board_ddr_config(bool rom_caller, board_ddr_action_t action)
+sc_err_t board_ddr_config(bool rom_caller, board_ddr_action_t action)
 {
     /* Note this is called by the ROM before the SCFW is initialized.
      * Do NOT make any unqualified calls to any other APIs.
@@ -816,9 +843,9 @@ sc_err_t  board_ddr_config(bool rom_caller, board_ddr_action_t action)
     /* Init the analog repeater from ROM stage, mandatory! */
     if (action == BOARD_DDR_COLD_INIT)
     {
-        DSC_AIRegisterWrite(0x01U, 12U, 0U, 0xef17U); //SC
-        DSC_AIRegisterWrite(0x28U, 12U, 0U, 0xef17U); //VPU
-        DSC_AIRegisterWrite(0x24U, 12U, 0U, 0xef13U); //DRC
+        ANA_WRITE(0x01U, 12U, 0U, 0xef17U); //SC
+        ANA_WRITE(0x28U, 12U, 0U, 0xef17U); //VPU
+        ANA_WRITE(0x24U, 12U, 0U, 0xef13U); //DRC
     }
 
     switch(action)
@@ -833,12 +860,12 @@ sc_err_t  board_ddr_config(bool rom_caller, board_ddr_action_t action)
             board_ddr_derate_periodic_enable(SC_FALSE);
     #endif
             board_ddr_periodic_enable(SC_FALSE);
-    #if defined RAMID1_BD_DDR_RET || defined RAMID2_BD_DDR_RET
+    #if defined RAMID1_BD_DDR_RET || defined RAMID2_BD_DDR_RET || defined RAMID3_BD_DDR_RET
             soc_ddr_enter_retention();
     #endif
             break;
         case BOARD_DDR_SR_DRC_OFF_EXIT:
-    #if defined RAMID1_BD_DDR_RET || defined RAMID2_BD_DDR_RET
+    #if defined RAMID1_BD_DDR_RET || defined RAMID2_BD_DDR_RET || defined RAMID3_BD_DDR_RET
             soc_ddr_exit_retention();
     #endif
     #ifdef LP4_MANUAL_DERATE_WORKAROUND
@@ -916,7 +943,7 @@ sc_err_t  board_ddr_config(bool rom_caller, board_ddr_action_t action)
                     break;
                 default:
                     /* legacy RAM handling */
-                    if (OTP_A35_DIS != 0x0) { /* DX has two A35 cores disabled */
+                    if (OTP_AP_2_DIS != 0x0) { /* DX has two A35 cores disabled */
                         #include "dcd/imx8x_ramid2_dcd_1.2GHz.h"
                     } else {
                         #include "dcd/imx8x_ramid3_dcd_1.2GHz.h"
@@ -945,129 +972,143 @@ void board_system_config(sc_bool_t early, sc_rm_pt_t pt_boot)
 
     sc_bool_t alt_config = SC_FALSE;
     sc_bool_t no_ap = SC_FALSE;
+    sc_bool_t ddrtest = SC_FALSE;
 
-    /* Get boot parameters. See the Boot Flags section for defintition
+    /* Get boot parameters. See the Boot Flags section for definition
        of these flags.*/
     boot_get_data(NULL, NULL, NULL, NULL, NULL, NULL, &alt_config,
-        NULL, NULL, &no_ap);
+        NULL, &ddrtest, &no_ap, NULL);
 
     board_print(3, "board_system_config(%d, %d)\n", early, alt_config);
 
+    /* Name default partitions */
+    PARTITION_NAME(SC_PT, "SCU");
+    PARTITION_NAME(SECO_PT, "SECO");
+    PARTITION_NAME(pt_boot, "BOOT");
+
     /* Configure initial resource allocation (note additional allocation
        and assignments can be made by the SCFW clients at run-time */
-    if ((alt_config != SC_FALSE) 
-        && (rm_is_resource_avail(SC_R_M4_0_PID0) != SC_FALSE))
+    if (alt_config != SC_FALSE)
     {
-        sc_rm_pt_t pt_m4_0;
-        sc_rm_mr_t mr_m4_0;
-        sc_rm_pt_t pt_sh;
-        sc_rm_mr_t mr_sh;
+        sc_rm_pt_t pt_m4_0 = SC_RM_NUM_PARTITION;
 
         #ifdef BOARD_RM_DUMP
             rm_dump(pt_boot);
         #endif
 
-        /* Mark all resources as not movable */
-        BRD_ERR(rm_set_resource_movable(pt_boot, SC_R_ALL, SC_R_ALL,
-            SC_FALSE));
-        BRD_ERR(rm_set_pad_movable(pt_boot, SC_P_ALL, SC_P_ALL,
-            SC_FALSE));
+        /* Name boot partition */
+        PARTITION_NAME(pt_boot, "AP0");
 
-        /* Allocate M4_0 partition */
-        BRD_ERR(rm_partition_alloc(pt_boot, &pt_m4_0, SC_FALSE, SC_TRUE,
-            SC_FALSE, SC_TRUE, SC_FALSE));
+        /* Keep baseboard reset */
+        BRD_ERR(rm_assign_pad(pt_boot, SC_PT, SC_P_SPI2_SDO));
 
-        /* Mark all M4_0 subsystem resources as movable */
-        BRD_ERR(rm_set_subsys_rsrc_movable(pt_boot, SC_R_M4_0_PID0,
-            SC_TRUE));
-        BRD_ERR(rm_set_pad_movable(pt_boot,SC_P_ADC_IN1,SC_P_ADC_IN2,
-            SC_TRUE));
-
-        /* Move some resources not in the M4_0 subsystem */
-        BRD_ERR(rm_set_resource_movable(pt_boot, SC_R_SYSTEM,
-            SC_R_SYSTEM, SC_TRUE));
-        BRD_ERR(rm_set_resource_movable(pt_boot, SC_R_IRQSTR_M4_0,
-            SC_R_IRQSTR_M4_0, SC_TRUE));
-        BRD_ERR(rm_set_resource_movable(pt_boot, SC_R_MU_5B,
-            SC_R_MU_5B, SC_TRUE));
-        BRD_ERR(rm_set_resource_movable(pt_boot, SC_R_MU_8B,
-            SC_R_MU_8B, SC_TRUE));
-        BRD_ERR(rm_set_resource_movable(pt_boot, SC_R_GPT_4,
-            SC_R_GPT_4, SC_TRUE));
-        BRD_ERR(rm_set_resource_movable(pt_boot, SC_R_CAN_0,
-            SC_R_CAN_2, SC_TRUE));
-        BRD_ERR(rm_set_resource_movable(pt_boot, SC_R_I2C_1,
-            SC_R_I2C_1, SC_TRUE));
-        BRD_ERR(rm_set_resource_movable(pt_boot, SC_R_FSPI_0,
-            SC_R_FSPI_0, SC_TRUE));
-        BRD_ERR(rm_set_resource_movable(pt_boot, SC_R_SECO_MU_4,
-            SC_R_SECO_MU_4, SC_TRUE));
-
-        /* Move some pads not in the M4_0 subsystem */
-        BRD_ERR(rm_set_pad_movable(pt_boot, SC_P_FLEXCAN0_RX,
-            SC_P_FLEXCAN2_TX, SC_TRUE));
-        BRD_ERR(rm_set_pad_movable(pt_boot,SC_P_USB_SS3_TC1,
-            SC_P_USB_SS3_TC1, SC_TRUE));
-        BRD_ERR(rm_set_pad_movable(pt_boot,SC_P_USB_SS3_TC3,
-            SC_P_USB_SS3_TC3, SC_TRUE));
-        BRD_ERR(rm_set_pad_movable(pt_boot, SC_P_QSPI0A_DATA0,
-            SC_P_COMP_CTL_GPIO_1V8_3V3_QSPI0B, SC_TRUE));
-
-        /* Move everything flagged as movable */
-        BRD_ERR(rm_move_all(pt_boot, pt_boot, pt_m4_0, SC_TRUE,
-            SC_TRUE));
-
-        /* Allow all to access the SEMA42 */
-        BRD_ERR(rm_set_peripheral_permissions(pt_m4_0,
-            SC_R_M4_0_SEMA42, SC_RM_PT_ALL, SC_RM_PERM_FULL));
-
-        /* Move M4 0 TCM */
-        BRD_ERR(rm_find_memreg(pt_boot, &mr_m4_0, 0x034FE0000ULL,
-            0x034FE0000ULL));
-        BRD_ERR(rm_assign_memreg(pt_boot, pt_m4_0, mr_m4_0));
-
-        /* Reserve DDR for M4_0 */
-        BRD_ERR(rm_memreg_frag(pt_boot, &mr_m4_0,
-            0x088000000ULL, 0x08FFFFFFFULL));
-        BRD_ERR(rm_assign_memreg(pt_boot, pt_m4_0, mr_m4_0));
-
-        /* Reserve FlexSPI for M4_0 */
-        BRD_ERR(rm_memreg_frag(pt_boot, &mr_m4_0, 0x08081000ULL,
-            0x08180FFFULL));
-        BRD_ERR(rm_assign_memreg(pt_boot, pt_m4_0, mr_m4_0));
-
-        /* Allow AP and M4_1 to use SYSTEM */
-        BRD_ERR(rm_set_peripheral_permissions(pt_m4_0, SC_R_SYSTEM,
-            pt_boot, SC_RM_PERM_SEC_RW));
-
-        /* Move partition to be owned by SC */
-        BRD_ERR(rm_set_parent(pt_boot, pt_m4_0, SC_PT));
-
-        /* Move boot to be owned by M4 0 */
-        if (no_ap != SC_FALSE)
+        /* Create M4 0 partition */
+        if (rm_is_resource_avail(SC_R_M4_0_PID0) != SC_FALSE)
         {
-            BRD_ERR(rm_set_parent(SC_PT, pt_boot, pt_m4_0));
+            sc_rm_mr_t mr;
+
+            /* List of resources */
+            static const sc_rsrc_t rsrc_list[10U] =
+            {
+                SC_R_SYSTEM,
+                SC_R_IRQSTR_M4_0,
+                SC_R_MU_5B,
+                SC_R_MU_8B,
+                SC_R_GPT_4,
+                RM_RANGE(SC_R_CAN_0, SC_R_CAN_2),
+                SC_R_I2C_1,
+                SC_R_FSPI_0,
+                SC_R_SECO_MU_4
+            };
+
+            /* List of pads */
+            static const sc_pad_t pad_list[8U] =
+            {
+                RM_RANGE(SC_P_ADC_IN1, SC_P_ADC_IN2),
+                RM_RANGE(SC_P_FLEXCAN0_RX, SC_P_FLEXCAN2_TX),
+                SC_P_USB_SS3_TC1,
+                SC_P_USB_SS3_TC3,
+                RM_RANGE(SC_P_QSPI0A_DATA0, SC_P_COMP_CTL_GPIO_1V8_3V3_QSPI0B)
+            };
+
+            /* List of memory regions */
+            static const sc_rm_mem_list_t mem_list[2U] =
+            {
+                {0x088000000ULL, 0x08FFFFFFFULL},
+                {0x008081000ULL, 0x008180FFFULL}
+            };
+
+            /* Create partition */
+            BRD_ERR(rm_partition_create(pt_boot, &pt_m4_0, SC_FALSE,
+                SC_TRUE, SC_FALSE, SC_TRUE, SC_FALSE, SC_R_M4_0_PID0,
+                rsrc_list, ARRAY_SIZE(rsrc_list),
+                pad_list, ARRAY_SIZE(pad_list),
+                mem_list, ARRAY_SIZE(mem_list)));
+
+            /* Name partition for debug */
+            PARTITION_NAME(pt_m4_0, "MCU0");
+            
+            /* Allow AP to use SYSTEM (not production!) */
+            BRD_ERR(rm_set_peripheral_permissions(SC_PT, SC_R_SYSTEM,
+                pt_boot, SC_RM_PERM_SEC_RW));
+
+            /* Move M4 0 TCM */
+            BRD_ERR(rm_find_memreg(pt_boot, &mr, 0x034FE0000ULL,
+                0x034FE0000ULL));
+            BRD_ERR(rm_assign_memreg(pt_boot, pt_m4_0, mr));
+
+            /* Move partition to be owned by SC */
+            BRD_ERR(rm_set_parent(pt_boot, pt_m4_0, SC_PT));
+
+            /* Check if booting with the no_ap flag set */
+            if (no_ap != SC_FALSE)
+            {
+                /* Move boot to be owned by M4 0 for Android Automotive */
+                BRD_ERR(rm_set_parent(SC_PT, pt_boot, pt_m4_0));
+            }
         }
 
-        /* Allocate shared partition */
-        BRD_ERR(rm_partition_alloc(SC_PT, &pt_sh, SC_FALSE, SC_TRUE,
-            SC_FALSE, SC_FALSE, SC_FALSE));
+        /* Allow all to access the SEMA42s */
+        BRD_ERR(rm_set_peripheral_permissions(SC_PT, SC_R_M4_0_SEMA42,
+            SC_RM_PT_ALL, SC_RM_PERM_FULL));
 
-        /* Create shared memory space */
-        BRD_ERR(rm_memreg_frag(pt_boot, &mr_sh,
-            0x090000000ULL, 0x091FFFFFFULL));
-        BRD_ERR(rm_assign_memreg(pt_boot, pt_sh, mr_sh));
-        BRD_ERR(rm_set_memreg_permissions(pt_sh, mr_sh, pt_boot,
-            SC_RM_PERM_FULL));
-        BRD_ERR(rm_set_memreg_permissions(pt_sh, mr_sh, pt_m4_0,
-            SC_RM_PERM_FULL));
+        /* Create partition for shared/hidden resources */
+        {
+            sc_rm_pt_t pt;
+            sc_rm_mr_t mr;
 
-        /* Protect some resources */
-        /* M4 PID1-4 can be used to allow M4 to map to other SID */
-        BRD_ERR(rm_assign_resource(pt_m4_0, pt_sh, SC_R_M4_0_PID1));
-        BRD_ERR(rm_assign_resource(pt_m4_0, pt_sh, SC_R_M4_0_PID2));
-        BRD_ERR(rm_assign_resource(pt_m4_0, pt_sh, SC_R_M4_0_PID3));
-        BRD_ERR(rm_assign_resource(pt_m4_0, pt_sh, SC_R_M4_0_PID4));
+            /* List of resources */
+            static const sc_rsrc_t rsrc_list[2U] =
+            {
+                RM_RANGE(SC_R_M4_0_PID1, SC_R_M4_0_PID4)
+            };
+
+            /* List of memory regions */
+            static const sc_rm_mem_list_t mem_list[1U] =
+            {
+                {0x090000000ULL, 0x091FFFFFFULL}
+            };
+
+            /* Create shared partition */
+            BRD_ERR(rm_partition_create(SC_PT, &pt, SC_FALSE, SC_TRUE,
+                SC_FALSE, SC_FALSE, SC_FALSE, SC_NUM_RESOURCE,
+                rsrc_list, ARRAY_SIZE(rsrc_list), NULL, 0U,
+                mem_list, ARRAY_SIZE(mem_list)));
+
+            /* Name partition for debug */
+            PARTITION_NAME(pt, "Shared");
+            
+            /* Share memory space */
+            BRD_ERR(rm_find_memreg(SC_PT, &mr,
+                mem_list[0U].addr_start, mem_list[0U].addr_start));
+            BRD_ERR(rm_set_memreg_permissions(pt, mr, pt_boot,
+                SC_RM_PERM_FULL));
+            if (pt_m4_0 != SC_RM_NUM_PARTITION)
+            {
+                BRD_ERR(rm_set_memreg_permissions(pt, mr, pt_m4_0,
+                    SC_RM_PERM_FULL));
+            }
+        }
 
         #ifdef BOARD_RM_DUMP
             rm_dump(pt_boot);
@@ -1368,10 +1409,8 @@ void board_fault(sc_bool_t restarted, sc_bfault_t reason,
        typical production build even if DEBUG defined */
 
     #ifdef DEBUG
-        /* Disable the WDOG */
-        WDOG32_Unlock(WDOG_SC);
-        WDOG32_SetTimeoutValue(WDOG_SC, 0xFFFF);
-        WDOG32_Disable(WDOG_SC);
+        /* Disable the watchdog */
+        board_wdog_disable(SC_FALSE);
 
         board_print(1, "board fault(%u, %u, %u)\n", restarted, reason, pt);
 
@@ -1507,12 +1546,15 @@ sc_err_t board_get_control(sc_rsrc_t resource, sc_rm_idx_t idx,
 /*--------------------------------------------------------------------------*/
 void PMIC_IRQHandler(void)
 {
+    /* Temp alarm */
     if (PMIC_IRQ_SERVICE(PMIC_0_ADDR))
     {
+        /* Trigger client interrupt */
         ss_irq_trigger(SC_IRQ_GROUP_TEMP, SC_IRQ_TEMP_PMIC0_HIGH,
             SC_PT_ALL);
     }
 
+    /* Clear IRQ */
     NVIC_ClearPendingIRQ(PMIC_INT_IRQn);
 }
 
@@ -1679,12 +1721,14 @@ static sc_err_t pmic_ignore_current_limit(uint8_t address,
         PF8100_LDO4
     };
 
+    /* Loop over supplies */
     for (idx = 0U; idx < 11U; idx++)
     {
         /* Read the config register first */
         err = PMIC_REGISTER_ACCESS(address, switchers[idx], SC_FALSE,
             &val);
 
+        /* Check for error? */
         if (err == SC_ERR_NONE)
         {
     		if (ver.si_rev == PF8100_A0_REV)
@@ -1707,10 +1751,12 @@ static sc_err_t pmic_ignore_current_limit(uint8_t address,
                 val |= 0xC0U;
             }
 
+            /* Write the config register */
             err = PMIC_REGISTER_ACCESS(address, switchers[idx], SC_TRUE,
                 &val);
         }
 
+        /* Stop loop if there is an error */
         if (err != SC_ERR_NONE)
         {
             break;
@@ -1726,7 +1772,6 @@ static sc_err_t pmic_ignore_current_limit(uint8_t address,
 static sc_err_t pmic_update_timing(uint8_t address)
 {
     sc_err_t err = SC_ERR_NONE;
-    uint8_t val = 0xED;
 
     /*
      * Add 60ms stable time for power down SW5/6/7/LDO2 on i.mx8QXP-MEK
@@ -1735,6 +1780,9 @@ static sc_err_t pmic_update_timing(uint8_t address)
      */
     if (address == PMIC_0_ADDR)
     {
+        uint8_t val = 0xED;
+
+        /* Update for PMIC 0 */
         err |= PMIC_REGISTER_ACCESS(address, 0x6F, SC_TRUE, &val);
         err |= PMIC_REGISTER_ACCESS(address, 0x77, SC_TRUE, &val);
         err |= PMIC_REGISTER_ACCESS(address, 0x7F, SC_TRUE, &val);
@@ -1744,6 +1792,7 @@ static sc_err_t pmic_update_timing(uint8_t address)
     }
     else
     {
+        /* Return error */
         err = SC_ERR_PARM;
     }
 
@@ -1792,6 +1841,7 @@ sc_err_t board_ioctl(sc_rm_pt_t caller_pt, sc_rsrc_t mu, uint32_t *parm1,
 {
     sc_err_t err = SC_ERR_NONE;
 
+#ifdef HAS_TEST
     /* For test_misc */
     if (*parm1 == 0xFFFFFFFEU)
     {
@@ -1799,13 +1849,19 @@ sc_err_t board_ioctl(sc_rm_pt_t caller_pt, sc_rsrc_t mu, uint32_t *parm1,
         *parm2 = mu;
         *parm3 = caller_pt;
     }
+    /* For test_wdog */
+    else if (*parm1 == 0xFFFFFFFBU)
+    {
+        HALT;
+    }
     else
     {
         err = SC_ERR_PARM;
     }
+#endif
 
     return err;
 }
 
-/**@}*/
+/** @} */
 

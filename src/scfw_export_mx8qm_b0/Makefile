@@ -175,6 +175,7 @@ ifndef lto
 endif
 ifeq ($(LTO),1)
     CFLAG_LTO = -flto
+	FLAGS += -DLTO
 endif
 
 # Configure tests
@@ -191,6 +192,9 @@ UPPER_T := $(shell echo $(T) | tr a-z A-Z)
 export T LOWER_T UPPER_T
 ifeq ($(LOWER_T),all)
 	FLAGS += -DTEST_ALL
+endif
+ifeq ($(LOWER_T),boottime)
+	FLAGS += -DTEST_BOOTTIME
 endif
 FLAGS += -DTEST=$(LOWER_T)
 
@@ -241,6 +245,12 @@ ifeq ($(AC),1)
 	FLAGS += -DAUTOCAL
 endif
 
+# Configure manifest
+MANIFEST := $(shell md5sum --status -c MANIFEST 1>&2 2> /dev/null; echo $$?)
+ifeq ($(MANIFEST),1)
+	FLAGS += -DDIRTY
+endif
+
 FLAGS += -DSREV_$(UPPER_R)
 
 OUT := $(OUT)_$(LOWER_R)
@@ -266,6 +276,10 @@ endif
 
 ifdef NO_OVLY
 	FLAGS += -DNO_OVLY
+endif
+
+ifdef NO_WDOG_DIS
+	FLAGS += -DNO_WDOG_DIS
 endif
 
 # Check config
@@ -434,6 +448,7 @@ else
 	DOX_ADD += platform/drivers/seco/fsl_seco.h
     DOX_ADD += platform/ss/inf
     DOX_ADD += $(foreach ss,$(SS),platform/ss/$(ss))
+    DOX_ADD += $(DOX_ADD_COMMON)
     DOX_ADD += platform/board/$(BOARD)
     DOX_ADD += $(foreach svc,$(SVC),platform/svc/$(svc))
 endif
@@ -483,12 +498,13 @@ CONFIGH+=$(SRC)/config/$(CONFIG)/pad_data.h
 CONFIGH+=$(SRC)/config/$(CONFIG)/pad_priority.h
 TPROTOH+=$(SRC)/test/$(CONFIG)/test_all.c $(SRC)/test/common/test.h $(SRC)/devices/$(DEVICE)/linker/gcc/$(DEVICE)_overlay.ld
 PAD_MD += $(SRC)/config/pad.txt
-MEMMAP_MD += $(SRC)/devices/$(DEVICE)/memmap.txt
+MEMMAP_MD += $(SRC)/devices/$(DEVICE)/memmap_md.txt
 
 BIH+=$(SRC)/main/build_info.h
 
 INCH+= $(SRC)/config/$(CONFIG)/all_api.h $(SRC)/config/$(CONFIG)/all_svc.h \
-	$(SRC)/config/$(CONFIG)/all_ss.h $(SRC)/config/$(CONFIG)/all_config.h
+	$(SRC)/config/$(CONFIG)/all_ss.h $(SRC)/config/$(CONFIG)/all_config.h \
+	$(SRC)/config/$(CONFIG)/ss_ver.h
 
 MD+=doc/resources.md doc/clocks.md doc/controls.md doc/pads.md
 
@@ -511,7 +527,11 @@ $(OUT)/sc : ${OBJS}
 
 .SUFFIXES :
 
-$(OUT)/board/%.o : $(SRC)/board/%.c ${INCH} ${INFH} ${CONFIGH} ${BIH} ${DCDH} $(SRC)/test/common/test.h
+# Include pkit makefiles
+MAKERULE2 := $(shell find makefiles -name Makefile.rules2)
+include $(foreach makerule,$(MAKERULE2),$(makerule))
+
+$(OUT)/board/board_common.o : $(SRC)/board/board_common.c ${INCH} ${INFH} ${CONFIGH} ${BIH} ${DCDH} $(SRC)/test/common/test.h
 	@echo "Compiling $<"
 	$(AT)${CC} ${CFLAGS} ${INCLUDE} -c $< -o $@
 
@@ -552,10 +572,6 @@ $(SRC)/board/$(CONFIG)_$(B)/dcd/dcd_retention.h : $(SRC)/board/$(CONFIG)_$(B)/dc
 	$(AT)echo "#define DDR_RETENTION_H" >> $@
 	$(AT)echo "#include \"$(DDR_CON)_retention.h\"" >> $@
 	$(AT)echo '#endif' >> $@
-
-$(OUT)/drivers/pmic/%.o : $(SRC)/drivers/pmic/%.c ${INCH} ${INFH} ${CONFIGH} ${BIH} ${DCDH}
-	@echo "Compiling $<"
-	$(AT)${CC} ${CFLAGS} ${INCLUDE} -c $< -o $@
 
 $(OUT)/fuses/%.txt : $(OUT)/ $(OUT)/sc
 	$(AT)mkdir -p $(OUT)/fuses
