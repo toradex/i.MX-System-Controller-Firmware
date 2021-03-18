@@ -1573,8 +1573,10 @@ static void pmic_init(void)
             }
 
             /* Prototypes, work around PMIC not yet fused */
-            (void) pf8100_pmic_set_mode(PMIC_0_ADDR, PF8100_LDO3, RUN_EN_STBY_OFF);
+            (void) pf8100_pmic_set_mode(PMIC_0_ADDR, PF8100_LDO3, RUN_EN_STBY_EN);
             (void) PMIC_SET_VOLTAGE(PMIC_0_ADDR, PF8100_LDO3, 3300, REG_RUN_MODE);
+            /* Due to hardware-requirements we don't want to turn off LDO3 in standby */
+            (void) PMIC_SET_VOLTAGE(PMIC_0_ADDR, PF8100_LDO3, 3300, REG_STBY_MODE);
 
             /* Configure STBY voltage for SW1 (VDD_MAIN) */
             if (board_parameter(BOARD_PARM_KS1_RETENTION)
