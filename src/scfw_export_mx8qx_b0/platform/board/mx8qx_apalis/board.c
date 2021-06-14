@@ -1349,6 +1349,20 @@ void board_fault(sc_bool_t restarted, sc_bfault_t reason,
 }
 
 /*--------------------------------------------------------------------------*/
+/* Handle SECO FW fault                                                     */
+/*--------------------------------------------------------------------------*/
+void board_sec_fault(uint8_t abort_module, uint8_t abort_line,
+    sc_sfault_t reason)
+{
+    #ifdef DEBUG
+        error_print("SECO Abort (mod %d, ln %d)\n", abort_module,
+            abort_line);
+    #else
+        board_fault(SC_FALSE, BOARD_BFAULT_SEC_FAIL, SECO_PT);
+    #endif
+}
+
+/*--------------------------------------------------------------------------*/
 /* Handle SECO/SNVS security violation                                      */
 /*--------------------------------------------------------------------------*/
 void board_security_violation(void)
