@@ -78,6 +78,14 @@
 #include "dcd/imx8_ramid2_dcd_1.6GHz_retention.h"
 #include "dcd/imx8_ramid3_dcd_1.6GHz_retention.h"
 
+/**
+ * Generate an error if BD_LPDDR4_INC_DQS2DQ is defined. If that is defined
+ * that means it need to be integrated into our RAM ID model.
+ */
+#ifdef BD_LPDDR4_INC_DQS2DQ
+    #error RAM ID dcd_retention integration needed!
+#endif
+
 /* Local Defines */
 
 /*!
