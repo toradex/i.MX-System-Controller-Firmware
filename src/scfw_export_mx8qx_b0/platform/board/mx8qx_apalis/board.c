@@ -48,6 +48,8 @@
  */
 /*==========================================================================*/
 
+/* This port meets SRS requirement PRD_00110 */
+
 /* Includes */
 
 #include "main/build_info.h"
@@ -58,6 +60,7 @@
 #include "main/soc.h"
 #include "board/pmic.h"
 #include "all_svc.h"
+#include "all_ss.h"
 #include "drivers/lpi2c/fsl_lpi2c.h"
 #include "drivers/pmic/fsl_pmic.h"
 #include "drivers/pmic/pf8100/fsl_pf8100.h"
@@ -157,6 +160,12 @@
     /*! Configure debug baud rate */
     #define DEBUG_BAUD          115200U
 #endif
+
+/*!
+ * Define to force power transition of subsytems as workaround for KS1
+ * excess power errata
+ */
+#define BOARD_FORCE_ALL_SS_PWR_TRANS
 
 /* Local Types */
 
@@ -258,6 +267,26 @@ void board_init(boot_phase_t phase)
 
         /* Init PMIC if not already done */
         pmic_init();
+
+#ifdef BOARD_FORCE_ALL_SS_PWR_TRANS
+        uint32_t power_ctrl;
+        /* Check if ADMA subsytem has been powered up at least once */
+        power_ctrl = DSC_ADMA->POWER_CTRL[PD_SS].RW;
+        if (((power_ctrl & DSC_POWER_CTRL_PFET_LF_EN_MASK) == 0U) &&
+            ((power_ctrl & DSC_PWRCTRL_MAIN_RFF_MASK) == 0U))
+        {
+            /* Transition ADMA resource to ensure SS powered once prior to KS1 */
+            pm_force_resource_power_mode_v(SC_R_IRQSTR_SCU2, SC_PM_PW_MODE_ON);
+            pm_force_resource_power_mode_v(SC_R_IRQSTR_SCU2, SC_PM_PW_MODE_OFF);
+
+            /* Evaluate HMP power mode after ADMA transition */
+            soc_update_hmp_sys_power_mode();
+        }
+
+        /* LSIO transitioned during base board reset via SC_R_GPIO_1.  No need
+         * to force transition.
+         */
+#endif
     }
 }
 

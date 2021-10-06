@@ -956,9 +956,7 @@
 #define SC_C_MISC1                      63U           
 #define SC_C_MISC2                      64U           
 #define SC_C_MISC3                      65U           
-#define SC_C_PMIC_I2C                   66U
-#define SC_C_PMIC_I2C_READ_REG          67U
-#define SC_C_LAST                       68U
+#define SC_C_LAST                       66U
 
 /*!
  * Define for used to specify all pads

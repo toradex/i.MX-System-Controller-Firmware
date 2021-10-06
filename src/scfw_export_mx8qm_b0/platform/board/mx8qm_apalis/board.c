@@ -48,6 +48,8 @@
  */
 /*==========================================================================*/
 
+/* This port meets SRS requirement PRD_00090 */
+
 /* Includes */
 
 #include "main/build_info.h"
@@ -58,6 +60,7 @@
 #include "main/soc.h"
 #include "board/pmic.h"
 #include "all_svc.h"
+#include "all_ss.h"
 #include "drivers/lpi2c/fsl_lpi2c.h"
 #include "drivers/pmic/fsl_pmic.h"
 #include "drivers/pmic/pf8100/fsl_pf8100.h"
@@ -151,6 +154,12 @@
     #define DEBUG_BAUD          115200U
 #endif
 
+/*!
+ * Define to force power transition of subsytems as workaround for KS1
+ * excess power errata
+ */
+#define BOARD_FORCE_ALL_SS_PWR_TRANS
+
 /* Local Types */
 
 /* Local Functions */
@@ -238,6 +247,19 @@ void board_init(boot_phase_t phase)
 
         /* Init PMIC if not already done */
         pmic_init();
+
+#ifdef BOARD_FORCE_ALL_SS_PWR_TRANS
+        uint32_t power_ctrl;
+        /* Check if LSIO subsytem has been powered up at least once */
+        power_ctrl = DSC_LSIO->POWER_CTRL[PD_SS].RW;
+        if (((power_ctrl & DSC_POWER_CTRL_PFET_LF_EN_MASK) == 0U) &&
+            ((power_ctrl & DSC_PWRCTRL_MAIN_RFF_MASK) == 0U))
+        {
+            /* Transition LSIO resource to ensure SS powered once prior to KS1 */
+            pm_force_resource_power_mode_v(SC_R_MU_0A, SC_PM_PW_MODE_ON);
+            pm_force_resource_power_mode_v(SC_R_MU_0A, SC_PM_PW_MODE_OFF);
+        }
+#endif
     }
 }
 
