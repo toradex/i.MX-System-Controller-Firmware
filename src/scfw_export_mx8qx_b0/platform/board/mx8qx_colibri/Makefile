@@ -33,6 +33,8 @@
 OBJS += $(OUT)/board/$(CONFIG)_$(B)/board.o \
 		$(OUT)/board/board_common.o
 
+FLAGS += -DENABLE_PMIC_EXTERNAL_WDOG
+
 ifneq ($(HW), SIMU)
     OBJS += $(OUT)/board/board.o
 endif

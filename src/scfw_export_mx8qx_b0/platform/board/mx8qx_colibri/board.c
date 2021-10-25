@@ -116,6 +116,15 @@
 #define BRD_R_BOARD_R7          10U      /*!< Test */
 /** @} */
 
+#ifdef ENABLE_PMIC_EXTERNAL_WDOG
+/* 0xF = 32768ms; 0xE = 16384ms; 0xD = 8192ms; 0xC = 4096ms; 0xB = 2048ms; 0xA = 1024ms; 0x9 = 512ms. */
+#define PMIC_EXTERNAL_WDOG_TIMEOUT  0xD
+
+const uint32_t board_pmic_wdog_refresh_period_ms = 1000U;
+
+static bool pmic_external_wdog_is_on = false;
+#endif
+
 #if DEBUG_UART == 3
     /*! Use debugger terminal emulation */
     #define DEBUG_TERM_EMUL
@@ -1299,9 +1308,15 @@ sc_err_t board_reset(sc_pm_reset_type_t type, sc_pm_reset_reason_t reason,
         LPUART_Deinit(LPUART_DEBUG);
     #endif
 
-    /* Request a warm reset */
-    soc_set_reset_info(reason, pt);
-    NVIC_SystemReset();
+        soc_set_reset_info(reason, pt);
+    #ifdef ENABLE_PMIC_EXTERNAL_WDOG
+        uint8_t val = 0;
+        /* Request to arm PMIC WDOG timer */
+        PMIC_REGISTER_ACCESS(PMIC_0_ADDR, 0x43, SC_TRUE, &val);
+    #else
+        /* Request a warm reset */
+        NVIC_SystemReset();
+    #endif
 
     return SC_ERR_UNAVAILABLE;
 }
@@ -1580,6 +1595,9 @@ static void pmic_init(void)
         static sc_bool_t pmic_checked = SC_FALSE;
         static lpi2c_master_config_t lpi2c_masterConfig;
         sc_pm_clock_rate_t rate = SC_24MHZ;
+#ifdef ENABLE_PMIC_EXTERNAL_WDOG
+        uint8_t val;
+#endif
 
         /* See if we already checked for the PMIC */
         if (pmic_checked == SC_FALSE)
@@ -1691,6 +1709,24 @@ static void pmic_init(void)
 
             /* Enable PMIC IRQ at NVIC level */
             NVIC_EnableIRQ(PMIC_INT_IRQn);
+
+        #ifdef ENABLE_PMIC_EXTERNAL_WDOG
+            /* Setup and start PMIC WDOG */
+            val = PMIC_EXTERNAL_WDOG_TIMEOUT;  /* Watchdog timer duration */
+            PMIC_REGISTER_ACCESS(PMIC_0_ADDR, 0x43, SC_TRUE, &val);
+
+            val = 0x20;  /* WD_MAX_EXPIRE = 2 */
+            PMIC_REGISTER_ACCESS(PMIC_0_ADDR, 0x45, SC_TRUE, &val);
+
+            val = 0xF0;  /* WD_MAX_CNT = 0xF */
+            PMIC_REGISTER_ACCESS(PMIC_0_ADDR, 0x46, SC_TRUE, &val);
+
+            PMIC_REGISTER_ACCESS(PMIC_0_ADDR, 0x37, SC_FALSE, &val);
+            val |= (1<<3);  /* Set WD_EN=1 */
+            PMIC_REGISTER_ACCESS(PMIC_0_ADDR, 0x37, SC_TRUE, &val);
+
+            pmic_external_wdog_is_on = true;
+        #endif
 
             board_print(3, "Finished  PMIC init\n\n");
         }
@@ -1832,6 +1868,21 @@ static void board_get_pmic_info(sc_sub_t ss, uint32_t *pmic_reg,
 /*--------------------------------------------------------------------------*/
 void board_tick(uint16_t msec)
 {
+#ifdef ENABLE_PMIC_EXTERNAL_WDOG
+    static uint32_t refresh_ms = 0U;
+    uint8_t val = 1;
+
+    if (pmic_external_wdog_is_on)
+    {
+        refresh_ms += msec;
+        if (refresh_ms >= board_pmic_wdog_refresh_period_ms)
+        {
+            refresh_ms = 0U;
+            val = 1;
+            PMIC_REGISTER_ACCESS(PMIC_0_ADDR, 0x44, SC_TRUE, &val);
+        }
+    }
+#endif
 }
 
 /*--------------------------------------------------------------------------*/
