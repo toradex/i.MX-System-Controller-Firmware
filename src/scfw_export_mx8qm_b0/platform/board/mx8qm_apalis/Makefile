@@ -37,6 +37,16 @@ ifneq ($(HW), SIMU)
     OBJS += $(OUT)/board/board.o
 endif
 
+ifeq ($(RAMID),1)
+    FLAGS += -DRAMID1
+else ifeq ($(RAMID),2)
+    FLAGS += -DRAMID2
+else ifeq ($(RAMID),3)
+    FLAGS += -DRAMID3
+else
+    FLAGS += -DRAMID1 -DRAMID2 -DRAMID3
+endif
+
 DCDH += $(SRC)/board/$(CONFIG)_$(B)/dcd/imx8_ramid1_dcd_1.6GHz.h \
 	$(SRC)/board/$(CONFIG)_$(B)/dcd/imx8_ramid2_dcd_1.6GHz.h \
 	$(SRC)/board/$(CONFIG)_$(B)/dcd/imx8_ramid3_dcd_1.6GHz.h \

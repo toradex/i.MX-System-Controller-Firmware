@@ -257,6 +257,7 @@ void board_init(boot_phase_t phase)
 {
     ss_print(3, "board_init(%d)\n", phase);
 
+#if defined(DEBUG_STD_UART) && defined(DEBUG) && !defined(SIMU)
     // when HW is initialized finish configuring LPUART3 and attach debug_uart
     if (phase == BOOT_PHASE_HW_INIT && DEBUG_UART == 6)
     {
@@ -268,6 +269,7 @@ void board_init(boot_phase_t phase)
         *c = 0x00c000dd;
         main_config_debug_uart(LPUART_DEBUG, SC_24MHZ);
     }
+#endif
 
     if (phase == BOOT_PHASE_FINAL_INIT)
     {

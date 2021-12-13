@@ -77,9 +77,15 @@
 #include "drivers/pad/fsl_pad.h"
 #include "MX8QM/MX8QM_tdx_user_fuse_map.h"
 
+#ifdef RAMID1
 #include "dcd/imx8_ramid1_dcd_1.6GHz_retention.h"
+#endif
+#ifdef RAMID2
 #include "dcd/imx8_ramid2_dcd_1.6GHz_retention.h"
+#endif
+#ifdef RAMID3
 #include "dcd/imx8_ramid3_dcd_1.6GHz_retention.h"
+#endif
 
 /**
  * Generate an error if BD_LPDDR4_INC_DQS2DQ is defined. If that is defined
@@ -126,15 +132,22 @@
     /*! Use alternate debug UART */
     #define ALT_DEBUG_SCU_UART
 #endif
+#if DEBUG_UART == 6
+    /*! Use standard Apalis debug UART */
+    #define DEBUG_STD_UART
+#endif
+
 #if (defined(MONITOR) || defined(EXPORT_MONITOR) || defined(HAS_TEST) \
         || (DEBUG_UART == 1)) && !defined(DEBUG_TERM_EMUL) \
-        && !defined(ALT_DEBUG_SCU_UART)
+        && !defined(ALT_DEBUG_SCU_UART) && !defined(DEBUG_STD_UART)
     #define ALT_DEBUG_UART
 #endif
 
 /*! Configure debug UART */
 #ifdef ALT_DEBUG_SCU_UART
     #define LPUART_DEBUG        LPUART_SC
+#elif defined(DEBUG_STD_UART)
+    #define LPUART_DEBUG        LPUART_1
 #else
     #define LPUART_DEBUG        LPUART_MCU_0
 #endif
@@ -142,6 +155,8 @@
 /*! Configure debug UART instance */
 #ifdef ALT_DEBUG_SCU_UART
     #define LPUART_DEBUG_INST   0U
+#elif defined(DEBUG_STD_UART)
+    #define LPUART_DEBUG_INST   LPUART_GetInstance(LPUART_1)
 #else
     #define LPUART_DEBUG_INST   2U
 #endif
@@ -240,6 +255,21 @@ void board_init(boot_phase_t phase)
 {
     ss_print(3, "board_init(%d)\n", phase);
 
+#if defined(DEBUG_STD_UART) && defined(DEBUG) && !defined(SIMU)
+    /* when HW is initialized finish configuring LPUART5 and attach debug_uart */
+    if (phase == BOOT_PHASE_HW_INIT && DEBUG_UART == 6)
+    {
+        LPUART_Type *uart;
+        uart = (LPUART_Type *) LPUART5_BASE;
+
+        uart->CTRL = 0x000c0000;
+        uart->BAUD = 0x0402008b;
+        uart->FIFO = 0x00c100dd;
+
+        main_config_debug_uart(LPUART_DEBUG, SC_24MHZ);
+    }
+#endif
+
     if (phase == BOOT_PHASE_FINAL_INIT)
     {
         /* Configure SNVS button for rising edge */
@@ -268,7 +298,7 @@ void board_init(boot_phase_t phase)
 /*--------------------------------------------------------------------------*/
 LPUART_Type *board_get_debug_uart(uint8_t *inst, uint32_t *baud)
 {
-    #if (defined(ALT_DEBUG_UART) || defined(ALT_DEBUG_SCU_UART)) \
+    #if (defined(ALT_DEBUG_UART) || defined(ALT_DEBUG_SCU_UART) || defined(DEBUG_STD_UART)) \
             && !defined(DEBUG_TERM_EMUL)
         *inst = LPUART_DEBUG_INST;
         *baud = DEBUG_BAUD;
@@ -285,7 +315,7 @@ LPUART_Type *board_get_debug_uart(uint8_t *inst, uint32_t *baud)
 void board_config_debug_uart(sc_bool_t early_phase)
 {
     #if (defined(ALT_DEBUG_UART) || defined(ALT_DEBUG_SCU_UART) || \
-            defined(DEBUG_TERM_EMUL)) && defined(DEBUG) && !defined(SIMU)
+            defined(DEBUG_TERM_EMUL)) || defined(DEBUG_STD_UART) && defined(DEBUG) && !defined(SIMU)
         static sc_bool_t banner = SC_FALSE;
     #endif
 
@@ -329,6 +359,31 @@ void board_config_debug_uart(sc_bool_t early_phase)
             /* Configure UART */
             main_config_debug_uart(LPUART_DEBUG, rate);
         }
+    #elif defined(DEBUG_STD_UART) && defined(DEBUG) && !defined(SIMU)
+        sc_pm_clock_rate_t rate = SC_80MHZ;
+        sc_ipc_t ipc_uart = 0;
+        // initializing clocks as done in U-Boot
+        pm_force_resource_power_mode_v(SC_R_UART_1, SC_PM_PW_MODE_ON);
+        sc_pm_set_clock_rate(ipc_uart, SC_R_UART_1, SC_PM_CLK_PER, &rate);
+        pm_force_clock_enable(SC_R_UART_1, SC_PM_CLK_PER,
+            SC_TRUE);
+        // Configure pads
+        pad_force_mux(SC_P_UART1_RX, 0, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
+        pad_force_mux(SC_P_UART1_TX, 0, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
+        // list based on resources powered on in u-boot
+        pm_force_resource_power_mode_v(SC_R_UART_1, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_DMA_2_CH10, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_DMA_2_CH11, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_GIC, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_GPIO_0, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_GPIO_3, SC_PM_PW_MODE_ON);
+        pm_force_resource_power_mode_v(SC_R_GPIO_4, SC_PM_PW_MODE_ON);
+        pad_force_mux(SC_P_MIPI_DSI1_GPIO0_01, 2, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
+        pm_force_resource_power_mode_v(SC_P_MIPI_DSI1_GPIO0_01, SC_PM_PW_MODE_ON);
+        pad_force_mux(SC_P_SAI1_RXD, 4, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
+        pm_force_resource_power_mode_v(SC_P_SAI1_RXD, SC_PM_PW_MODE_ON);
+        pad_force_mux(SC_P_SAI1_RXC, 3, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
+        pm_force_resource_power_mode_v(SC_P_SAI1_RXC, SC_PM_PW_MODE_ON);
     #elif defined(DEBUG_TERM_EMUL) && defined(DEBUG) && !defined(SIMU)
         *SCFW_DBG_TX_PTR = 0U;
         *SCFW_DBG_RX_PTR = 0U;
@@ -337,7 +392,7 @@ void board_config_debug_uart(sc_bool_t early_phase)
     #endif
 
     #if (defined(ALT_DEBUG_UART) || defined(ALT_DEBUG_SCU_UART) || \
-            defined(DEBUG_TERM_EMUL)) && defined(DEBUG) && !defined(SIMU)
+            defined(DEBUG_TERM_EMUL)) || defined(DEBUG_STD_UART) && defined(DEBUG) && !defined(SIMU)
         if (banner == SC_FALSE)
         {
             debug_print(1, 
@@ -400,6 +455,14 @@ void board_config_sc(sc_rm_pt_t pt_sc)
         (void) rm_set_pad_movable(pt_sc, SC_P_SCU_GPIO0_00,
             SC_P_SCU_GPIO0_01, SC_FALSE);
     #endif
+
+    #ifdef DEBUG_STD_UART
+        sc_rm_pt_t pt_uart1;
+        rm_get_pad_owner(SC_P_UART1_RX, &pt_uart1);
+        (void) rm_set_resource_movable(pt_uart1, SC_R_UART_1, SC_R_UART_1, SC_FALSE);
+        (void) rm_set_pad_movable(pt_uart1, SC_P_UART1_RX, SC_P_UART1_TX, SC_FALSE);
+    #endif
+
     /* RESET_MOCI#_DRV, HSIC_HUB_CONNECT */
     (void) rm_set_pad_movable(pt_sc, SC_P_SCU_GPIO0_02, SC_P_SCU_GPIO0_03,
         SC_TRUE);
@@ -557,6 +620,7 @@ static int board_init_ddr_get_ramid(void) {
     }
 }
 
+#ifdef RAMID1
 static soc_ddr_ret_info_t* board_init_ddr_ramid_1(void) {
     /*
      * Variables for DDR retention
@@ -614,7 +678,9 @@ static soc_ddr_ret_info_t* board_init_ddr_ramid_1(void) {
     };
     return &board_ddr_ret_info_qm;
 }
+#endif
 
+#ifdef RAMID2
 static soc_ddr_ret_info_t* board_init_ddr_ramid_2(void) {
     /*
      * Variables for DDR retention
@@ -672,7 +738,9 @@ static soc_ddr_ret_info_t* board_init_ddr_ramid_2(void) {
     };
     return &board_ddr_ret_info_qp;
 }
+#endif
 
+#ifdef RAMID3
 static soc_ddr_ret_info_t* board_init_ddr_ramid_3(void) {
     /*
      * Variables for DDR retention
@@ -730,6 +798,7 @@ static soc_ddr_ret_info_t* board_init_ddr_ramid_3(void) {
     };
     return &board_ddr_ret_info_qp;
 }
+#endif
 
 /*--------------------------------------------------------------------------*/
 /* Init DDR                                                                 */
@@ -740,21 +809,27 @@ sc_err_t board_init_ddr(sc_bool_t early, sc_bool_t ddr_initialized)
 
     switch (board_init_ddr_get_ramid())
     {
+    #ifdef RAMID3
     case 0x3:
         #if defined(RAMID3_BD_DDR_RET) & !defined(SKIP_DDR)
             board_ddr_ret_info = board_init_ddr_ramid_3();
         #endif
         break;
+    #endif
+    #ifdef RAMID2
     case 0x2:
         #if defined(RAMID2_BD_DDR_RET) & !defined(SKIP_DDR)
             board_ddr_ret_info = board_init_ddr_ramid_2();
         #endif
         break;
+    #endif
+    #ifdef RAMID1
     case 0x1:
         #if defined(RAMID1_BD_DDR_RET) & !defined(SKIP_DDR)
             board_ddr_ret_info = board_init_ddr_ramid_1();
         #endif
         break;
+    #endif
     default:
         /* legacy ram handling */
         if (OTP_AP_1_DIS != 0x0) { /* QP has one A72 core disabled */
@@ -947,15 +1022,21 @@ sc_err_t board_ddr_config(bool rom_caller, board_ddr_action_t action)
         default:
             switch (board_init_ddr_get_ramid())
             {
+            #ifdef RAMID3
             case 0x3:
                 #include "dcd/imx8_ramid3_dcd_1.6GHz.h"
                 break;
+            #endif
+            #ifdef RAMID2
             case 0x2:
                 #include "dcd/imx8_ramid2_dcd_1.6GHz.h"
                 break;
+            #endif
+            #ifdef RAMID1
             case 0x1:
                 #include "dcd/imx8_ramid1_dcd_1.6GHz.h"
                 break;
+            #endif
             default:
                 /* legacy ram handling */
                 if (OTP_AP_1_DIS != 0x0) { /* QP has one A72 core disabled */
