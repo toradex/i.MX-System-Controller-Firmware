@@ -43,16 +43,20 @@ else ifeq ($(RAMID),2)
     FLAGS += -DRAMID2
 else ifeq ($(RAMID),3)
     FLAGS += -DRAMID3
+else ifeq ($(RAMID),4)
+    FLAGS += -DRAMID4
 else
-    FLAGS += -DRAMID1 -DRAMID2 -DRAMID3
+    FLAGS += -DRAMID1 -DRAMID2 -DRAMID3 -DRAMID4
 endif
 
 DCDH += $(SRC)/board/$(CONFIG)_$(B)/dcd/imx8_ramid1_dcd_1.6GHz.h \
 	$(SRC)/board/$(CONFIG)_$(B)/dcd/imx8_ramid2_dcd_1.6GHz.h \
 	$(SRC)/board/$(CONFIG)_$(B)/dcd/imx8_ramid3_dcd_1.6GHz.h \
+	$(SRC)/board/$(CONFIG)_$(B)/dcd/imx8_ramid4_dcd_1.6GHz.h \
 	$(SRC)/board/$(CONFIG)_$(B)/dcd/imx8_ramid1_dcd_1.6GHz_retention.h \
 	$(SRC)/board/$(CONFIG)_$(B)/dcd/imx8_ramid2_dcd_1.6GHz_retention.h \
-	$(SRC)/board/$(CONFIG)_$(B)/dcd/imx8_ramid3_dcd_1.6GHz_retention.h
+	$(SRC)/board/$(CONFIG)_$(B)/dcd/imx8_ramid3_dcd_1.6GHz_retention.h \
+	$(SRC)/board/$(CONFIG)_$(B)/dcd/imx8_ramid4_dcd_1.6GHz_retention.h
 
 RSRC_MD += $(SRC)/board/$(CONFIG)_$(B)/resource.txt
 
