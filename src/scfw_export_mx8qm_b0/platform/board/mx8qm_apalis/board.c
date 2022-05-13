@@ -185,7 +185,6 @@
 static void pmic_init(void);
 static sc_err_t pmic_ignore_current_limit(uint8_t address);
 static sc_err_t pmic_update_timing(uint8_t address);
-static sc_err_t pmic_match_otp(uint8_t address, pmic_version_t ver);
 static void board_get_pmic_info(sc_sub_t ss,pmic_id_t *pmic_id,
     uint32_t *pmic_reg, uint8_t *num_regs);
 
@@ -2025,9 +2024,6 @@ static void pmic_init(void)
             err |= pmic_update_timing(PMIC_0_ADDR);
             err |= pmic_update_timing(PMIC_1_ADDR);
 
-            err |= pmic_match_otp(PMIC_0_ADDR, pmic_ver);
-            err |= pmic_match_otp(PMIC_1_ADDR, pmic_ver);
-
             /* Enable WDI detection in Standby */
             err |= pf8100_pmic_wdog_enable(PMIC_0_ADDR, SC_FALSE, SC_FALSE, SC_TRUE);
             err |= pf8100_pmic_wdog_enable(PMIC_1_ADDR, SC_FALSE, SC_FALSE, SC_TRUE);
@@ -2168,58 +2164,6 @@ static sc_err_t pmic_update_timing(uint8_t address)
     {
         /* Return error */
         err = SC_ERR_PARM;
-    }
-
-    return err;
-}
-
-/*--------------------------------------------------------------------------*/
-/* Check correct version of OTP for PF8100                                  */
-/*--------------------------------------------------------------------------*/
-static sc_err_t pmic_match_otp(uint8_t address, pmic_version_t ver)
-{
-    uint8_t reg_value = 0U;
-    uint16_t prog_id, match;
-    sc_err_t err = SC_ERR_NONE;
-
-    if (address == PMIC_0_ADDR)
-    {
-        match = EP_PROG_ID;
-    }
-    else
-    {
-        match = EQ_PROG_ID;
-    }
-
-    /* Read Prog ID */
-    err |= PMIC_REGISTER_ACCESS(address, 0x2, SC_FALSE, &reg_value);
-    prog_id = (((uint16_t)reg_value << 4U) & 0x0F00U);
-    err |= PMIC_REGISTER_ACCESS(address, 0x3U, SC_FALSE, &reg_value);
-    prog_id |= reg_value;
-
-    /* test against calibration fusing */
-    if (OTP_PROG_FUSE_VERSION_1_7V_CAL != 0U)
-    {
-        if (ver.si_rev >= PF8100_C1_SI_REV)
-        {
-            /* if C1 PMIC test for correct OTP */
-            if(prog_id != match){/* allow only 1.7v OTP */
-                error_print("PMIC INVALID!\n");
-            }
-        }
-        else
-        {
-            error_print("PMIC INVALID!\n");
-        }
-    }
-    else
-    {
-        if (ver.si_rev >= PF8100_C1_SI_REV)
-        {
-            if(prog_id == match){/* prohibit only 1.7V OTP */
-                error_print("PMIC INVALID!\n");
-            }
-        }
     }
 
     return err;
