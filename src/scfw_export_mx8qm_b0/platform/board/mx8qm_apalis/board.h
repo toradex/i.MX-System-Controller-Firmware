@@ -50,10 +50,6 @@
 
 /* Defines */
 
-#if 0
-    #define SKIP_DDR
-#endif
-
 /*! Configure PMIC I2C */
 #define LPI2C_PMIC              LPI2C_SC
 
