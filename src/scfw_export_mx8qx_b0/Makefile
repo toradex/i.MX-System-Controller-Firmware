@@ -245,6 +245,17 @@ ifeq ($(AC),1)
 	FLAGS += -DAUTOCAL
 endif
 
+# Configure SECO
+ifdef seco
+    SECO := $(seco)
+endif
+ifndef SECO
+    SECO = 1
+endif
+ifeq ($(SECO),0)
+	FLAGS += -DSECO_DISABLE -DV2X_DISABLE
+endif
+
 # Configure manifest
 MANIFEST := $(shell md5sum --status -c MANIFEST 1>&2 2> /dev/null; echo $$?)
 ifeq ($(MANIFEST),1)
