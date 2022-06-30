@@ -148,7 +148,7 @@ static bool pmic_external_wdog_is_on = false;
 #ifdef ALT_DEBUG_SCU_UART
     #define LPUART_DEBUG        LPUART_SC
 #elif defined(DEBUG_STD_UART)
-    #define LPUART_DEBUG        LPUART6
+    #define LPUART_DEBUG        LPUART5
 #else
     #define LPUART_DEBUG        LPUART_MCU_0
 #endif
@@ -157,7 +157,7 @@ static bool pmic_external_wdog_is_on = false;
 #ifdef ALT_DEBUG_SCU_UART
     #define LPUART_DEBUG_INST   0U
 #elif defined(DEBUG_STD_UART)
-    #define LPUART_DEBUG_INST   5U
+    #define LPUART_DEBUG_INST   LPUART_GetInstance(LPUART_DEBUG)
 #else
     #define LPUART_DEBUG_INST   1U
 #endif
@@ -257,20 +257,6 @@ void board_init(boot_phase_t phase)
 {
     ss_print(3, "board_init(%d)\n", phase);
 
-#if defined(DEBUG_STD_UART) && defined(DEBUG) && !defined(SIMU)
-    // when HW is initialized finish configuring LPUART3 and attach debug_uart
-    if (phase == BOOT_PHASE_HW_INIT && DEBUG_UART == 6)
-    {
-        volatile uint64_t * a = (uint64_t *) 0x5a090018;
-        volatile uint64_t * b = (uint64_t *) 0x5a090010;
-        volatile uint64_t * c = (uint64_t *) 0x5a090028;
-        *a = 0x000c0000;
-        *b = 0x19000008;
-        *c = 0x00c000dd;
-        main_config_debug_uart(LPUART_DEBUG, SC_24MHZ);
-    }
-#endif
-
     if (phase == BOOT_PHASE_FINAL_INIT)
     {
         /* Configure SNVS button for rising edge */
@@ -369,63 +355,31 @@ void board_config_debug_uart(sc_bool_t early_phase)
             main_config_debug_uart(LPUART_DEBUG, rate);
         }
     #elif defined(DEBUG_STD_UART) && defined(DEBUG) && !defined(SIMU)
-        sc_pm_clock_rate_t rate = SC_80MHZ;
-        sc_ipc_t ipc_uart = 0;
-        sc_err_t sciErr = 0;
+        if ((SCFW_DBG_READY == 0U) && (early_phase == SC_FALSE))
+        {
+            sc_pm_clock_rate_t rate = SC_24MHZ;
 
-        // initializing clocks as done in U-Boot
-        sciErr = pm_set_clock_rate(SC_PT, SC_R_UART_0, SC_PM_CLK_PER, &rate);
-        if (sciErr != SC_ERR_NONE)
-            debug_print(1, "\nSet clock rate of UART0 failed.");
+            /* Configure pads */
+            pad_force_mux(SC_P_FLEXCAN2_RX, 2,
+                SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
+            pad_force_mux(SC_P_FLEXCAN2_TX, 2,
+                SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
+            pad_force_mux(SC_P_QSPI0B_DQS, 4,
+                SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
 
-        pm_force_resource_power_mode_v(SC_R_UART_3, SC_PM_PW_MODE_ON);
-        sciErr = sc_pm_set_clock_rate(ipc_uart, SC_R_UART_3, SC_PM_CLK_PER, &rate);
-        if (sciErr != SC_ERR_NONE)
-            debug_print(1, "\nSet clock rate of UART3 failed.");
-        pm_force_clock_enable(SC_R_UART_3, SC_PM_CLK_PER,
-            SC_TRUE);
+            /* Power and enable clock */
+            pm_force_resource_power_mode_v(SC_R_UART_3, SC_PM_PW_MODE_ON);
+            pm_force_resource_power_mode_v(SC_R_MCU_0_PID0,
+                SC_PM_PW_MODE_ON);
 
-        // Configure pads
-        pad_force_mux(SC_P_FLEXCAN2_RX, 2, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
-        pad_force_mux(SC_P_FLEXCAN2_TX, 2, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
-        pad_force_mux(SC_P_QSPI0B_DQS, 4, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
+            (void) pm_set_clock_rate(SC_PT, SC_R_UART_3, SC_PM_CLK_PER,
+                &rate);
+            (void) pm_clock_enable(SC_PT, SC_R_UART_3, SC_PM_CLK_PER,
+                SC_TRUE, SC_FALSE);
 
-        // list based on resources powered on in u-boot
-        pm_force_resource_power_mode_v(SC_R_DB, SC_PM_PW_MODE_ON);
-        pm_force_resource_power_mode_v(SC_R_SC_PID0, SC_PM_PW_MODE_ON);
-        pm_force_resource_power_mode_v(SC_R_SC_TPM, SC_PM_PW_MODE_ON);
-        pm_force_resource_power_mode_v(SC_R_SC_UART, SC_PM_PW_MODE_ON);
-        pm_force_resource_power_mode_v(SC_R_SC_I2C, SC_PM_PW_MODE_ON);
-        pm_force_resource_power_mode_v(SC_R_SC_MU_0B, SC_PM_PW_MODE_ON);
-        pm_force_resource_power_mode_v(SC_R_SC_MU_1A, SC_PM_PW_MODE_ON);
-        pm_force_resource_power_mode_v(SC_R_A35, SC_PM_PW_MODE_ON);
-        pm_force_resource_power_mode_v(SC_R_A35_0, SC_PM_PW_MODE_ON);
-        pm_force_resource_power_mode_v(SC_R_SDHC_0, SC_PM_PW_MODE_ON);
-        pm_force_resource_power_mode_v(SC_R_SDHC_1, SC_PM_PW_MODE_ON);
-        pm_force_resource_power_mode_v(SC_R_USB_0, SC_PM_PW_MODE_ON);
-        pm_force_resource_power_mode_v(SC_R_USB_0_PHY, SC_PM_PW_MODE_ON);
-        pm_force_resource_power_mode_v(SC_R_USB_1, SC_PM_PW_MODE_ON);
-        pm_force_resource_power_mode_v(SC_R_USB_1_PHY, SC_PM_PW_MODE_ON);
-        pm_force_resource_power_mode_v(SC_R_USB_2, SC_PM_PW_MODE_ON);
-        pm_force_resource_power_mode_v(SC_R_USB_2_PHY, SC_PM_PW_MODE_ON);
-        pm_force_resource_power_mode_v(SC_R_DRC_0, SC_PM_PW_MODE_ON);
-        pm_force_resource_power_mode_v(SC_R_GPIO_0, SC_PM_PW_MODE_ON);
-        pm_force_resource_power_mode_v(SC_R_GPT_0, SC_PM_PW_MODE_ON);
-        pm_force_resource_power_mode_v(SC_R_MU_0A, SC_PM_PW_MODE_ON);
-        pm_force_resource_power_mode_v(SC_R_MU_1A, SC_PM_PW_MODE_ON);
-        pad_force_mux(SC_P_MIPI_DSI1_GPIO0_01, 2, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
-        pm_force_resource_power_mode_v(SC_P_MIPI_DSI1_GPIO0_01, SC_PM_PW_MODE_ON);
-        pad_force_mux(SC_P_SAI1_RXD, 4, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
-        pm_force_resource_power_mode_v(SC_P_SAI1_RXD, SC_PM_PW_MODE_ON);
-        pad_force_mux(SC_P_SAI1_RXC, 3, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
-        pm_force_resource_power_mode_v(SC_P_SAI1_RXC, SC_PM_PW_MODE_ON);
-        pad_force_mux(SC_P_CSI_RESET, 4, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
-        pm_force_resource_power_mode_v(SC_P_CSI_RESET, SC_PM_PW_MODE_ON);
-        pad_force_mux(SC_P_USDHC1_CD_B, 4, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
-        pm_force_resource_power_mode_v(SC_P_USDHC1_CD_B, SC_PM_PW_MODE_ON);
-        pad_force_mux(SC_P_CSI_EN, 4, SC_PAD_CONFIG_OUT_IN, SC_PAD_ISO_OFF);
-        pm_force_resource_power_mode_v(SC_P_CSI_EN, SC_PM_PW_MODE_ON);
-
+            /* Configure UART */
+            main_config_debug_uart(LPUART_DEBUG, rate);
+        }
     #elif defined(DEBUG_TERM_EMUL) && defined(DEBUG) && !defined(SIMU)
         *SCFW_DBG_TX_PTR = 0U;
         *SCFW_DBG_RX_PTR = 0U;
@@ -434,7 +388,7 @@ void board_config_debug_uart(sc_bool_t early_phase)
     #endif
 
     #if (defined(ALT_DEBUG_UART) || defined(ALT_DEBUG_SCU_UART) || \
-            defined(DEBUG_TERM_EMUL)) || defined(DEBUG_STD_UART) && defined(DEBUG) && !defined(SIMU)
+            defined(DEBUG_TERM_EMUL) || defined(DEBUG_STD_UART)) && defined(DEBUG) && !defined(SIMU)
         if (banner == SC_FALSE)
         {
             debug_print(1, 
