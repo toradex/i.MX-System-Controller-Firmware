@@ -1883,6 +1883,39 @@ sc_err_t board_ioctl(sc_rm_pt_t caller_pt, sc_rsrc_t mu, uint32_t *parm1,
 /*--------------------------------------------------------------------------*/
 sc_err_t board_monitor_custom(int argc, char *argv[])
 {
+
+    // Finds owner of the pad
+    sc_rm_pt_t pt_GPIO0;
+    rm_get_pad_owner(SC_P_ADC_IN2, &pt_GPIO0);
+
+    // Check Mux
+    uint8_t mux;
+    sc_pad_config_t sc_config;
+    sc_pad_iso_t iso;
+    pad_get_mux(pt_GPIO0, SC_P_ADC_IN2, &mux, &sc_config, &iso);
+
+    if (argc !=1){
+        debug_print(1, "\nThe custom command needs one argument\nAvailabe arguments:\n0   set TBBEN to low\n1   set TBBEN to high\n");
+    }
+
+    if (mux != 4){
+        // Configuration for a Output GPIO
+        gpio_pin_config_t config;
+        config.direction = kGPIO_DigitalOutput;
+        pm_force_resource_power_mode_v(SC_R_GPIO_1, SC_PM_PW_MODE_ON);
+
+        // Muxes pad to LSIO.GPIO1.IO10 and configures it as IN OUT
+        pad_force_mux(SC_P_ADC_IN2, 4U, SC_PAD_CONFIG_NORMAL,
+        SC_PAD_ISO_OFF);
+
+        // Initialize GPIO and set as Output High
+        config.outputLogic  = 0U;
+        GPIO_PinInit(GPIO1, 12U, &config);
+        SYSTICK_CycleDelay(SC_SYSTICK_NSEC_TO_TICKS(30U) + 1U);
+    }
+
+    GPIO_PinWrite(GPIO1, 12U, *argv[0] - '0');
+
     return SC_ERR_NONE;
 }
 
