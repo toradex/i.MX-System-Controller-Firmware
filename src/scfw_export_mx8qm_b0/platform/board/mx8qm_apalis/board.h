@@ -93,8 +93,8 @@
 
 /* DQS2DQ can be synchronized to the ISI to avoid DDR bus contention.  Define
  * BOARD_DQS2DQ_SYNC to enable synchronization and configure parameters
- * using the BOARD_DQS2DQ defines below.  Note these defines only apply 
- * if BD_LPDDR4_INC_DQS2DQ is defined.  BOARD_DQS2DQ_ISI_RSRC and 
+ * using the BOARD_DQS2DQ defines below.  Note these defines only apply
+ * if BD_LPDDR4_INC_DQS2DQ is defined.  BOARD_DQS2DQ_ISI_RSRC and
  * BOARD_DQS2DQ_ISI_REG must be assigned to the same respective ISI
  * channel.  BOARD_DQS2DQ_SYNC_TIME determines the search window for ISI
  * synchronization before firmware will yield to other service requests.
@@ -103,7 +103,7 @@
  * of synchronizing to the ISI frame.
  */
 #define BOARD_DQS2DQ_SYNC                       /* DQS2DQ sync enable */
-#define BOARD_DQS2DQ_ISI_RSRC   SC_R_ISI_CH0    /* DQS2DQ sync ISI resource */ 
+#define BOARD_DQS2DQ_ISI_RSRC   SC_R_ISI_CH0    /* DQS2DQ sync ISI resource */
 #define BOARD_DQS2DQ_ISI_REG    ISI0            /* DQS2DQ sync ISI registers */
 #define BOARD_DQS2DQ_SYNC_TIME  100U            /* DQS2DQ sync usec timeout */
 
