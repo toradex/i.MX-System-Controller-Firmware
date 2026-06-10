@@ -1668,6 +1668,24 @@ void board_reboot_part_cont(sc_rm_pt_t pt, sc_rsrc_t *boot_cpu,
     /* Code can modify boot parameters on a reboot. Called after partition
      * is powered off but before it is powered back on and started.
      */
+
+    /* Reset the USB HSIC pads to their power-up state on a partition reboot.
+     *
+     * On a partition reboot the SCU stays alive, so (unlike a full SoC reset)
+     * the IOMUX pad config is NOT defaulted: the HSIC pads keep the value the
+     * previous OS left (active: DSE high-speed, pull-down/none). That stale
+     * pad state locks the USB3503 hub; it then fails both its I2C config
+     * (SP_ILOCK) and HSIC enumeration.
+     * Restoring the power-up config (mux 0, NORMAL, ISO off, gp ctrl 0x85 =
+     * DSE 10mA, bus-keeper) lets the hub work correctly.
+     */
+    if (pt == BOOT_PT)
+    {
+        pad_set_all(pt, SC_P_USB_HSIC0_DATA, 0U, SC_PAD_CONFIG_NORMAL,
+                    SC_PAD_ISO_OFF, 0x85U, SC_PAD_WAKEUP_OFF);
+        pad_set_all(pt, SC_P_USB_HSIC0_STROBE, 0U, SC_PAD_CONFIG_NORMAL,
+                    SC_PAD_ISO_OFF, 0x85U, SC_PAD_WAKEUP_OFF);
+    }
 }
 
 /*--------------------------------------------------------------------------*/
